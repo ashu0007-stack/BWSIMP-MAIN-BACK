@@ -28,18 +28,23 @@ export const getREPWorks = async (req, res) => {
     c.agreement_no,
     c.contract_awarded_amount,
     c.nameofauthrizeperson,
-    c.work_commencement_date,
-    c.work_stipulated_date,
+    -- Date formatting
+    DATE_FORMAT(c.work_commencement_date, '%d-%m-%Y') as work_commencement_date,
+    DATE_FORMAT(c.work_stipulated_date, '%d-%m-%Y') as work_stipulated_date,
     c.email AS contractor_email,
     d.division_name as division_name,
-	ci.circle_name,
+    ci.circle_name,
     z.zone_name,
-    c.agency_address
+    c.agency_address,
+    wb.total_population,
+    v.census_population
 FROM work w
 INNER JOIN divisions d ON w.division_id = d.id
-left JOIN circles ci ON w.circle_id = ci.id
-left join zones z on w.zone_id = z.id
+LEFT JOIN circles ci ON w.circle_id = ci.id
+LEFT JOIN zones z ON w.zone_id = z.id
 LEFT JOIN contractors c ON w.id = c.work_id
+LEFT JOIN work_beneficiaries wb ON w.id = wb.work_id
+LEFT JOIN work_villages v ON w.id = v.work_id
 ORDER BY w.id DESC;
     `);
 
@@ -54,69 +59,79 @@ export const getREPMilestonesByWorkId = async (req, res) => {
   const { workId } = req.params;
 
   try {
+    // Use the corrected SQL query
     const [rows] = await db.query(`
-      SELECT
+      SELECT 
         m.milestone_number,
-        m.completed_quantity,
-        c.total_qty,
-        c.num_of_milestones
+        COALESCE(m.milestone_name, CONCAT('Milestone ', m.milestone_number)) AS milestone_name,
+        
+        -- Total milestone quantity (from milestones table)
+        SUM(COALESCE(m.milestone_qty, 0)) AS total_milestone_qty,
+        
+        -- Total completed quantity (from milestones table)
+        SUM(COALESCE(m.completed_quantity, 0)) AS total_completed_qty,
+        
+        -- Calculate achievement percentage: (completed / milestone_qty) * 100
+        CASE 
+            WHEN SUM(COALESCE(m.milestone_qty, 0)) > 0
+            THEN ROUND(
+                (SUM(COALESCE(m.completed_quantity, 0)) * 100) / 
+                SUM(COALESCE(m.milestone_qty, 0)),
+                2
+            )
+            ELSE 0 
+        END AS achievement_percentage,
+        
+        -- Remaining quantity
+        ROUND(
+            SUM(COALESCE(m.milestone_qty, 0)) - SUM(COALESCE(m.completed_quantity, 0)),
+            2
+        ) AS remaining_qty,
+        
+        -- Status based on percentage
+        CASE 
+            WHEN SUM(COALESCE(m.milestone_qty, 0)) > 0 
+                 AND (SUM(COALESCE(m.completed_quantity, 0)) * 100) / SUM(COALESCE(m.milestone_qty, 0)) >= 100 
+                 THEN 'Completed'
+            WHEN SUM(COALESCE(m.completed_quantity, 0)) > 0 
+                 THEN 'In Progress'
+            ELSE 'Not Started'
+        END AS milestone_status,
+        
+        -- Additional useful info
+        COUNT(DISTINCT m.component_id) AS components_count,
+         DATE_FORMAT((m.work_start_date), '%d-%m-%Y') AS work_start_date,
+    DATE_FORMAT((m.work_stipulated_date), '%d-%m-%Y') AS work_stipulated_date,
+    DATE_FORMAT((m.work_actualcompletion_date), '%d-%m-%Y') AS work_actualcompletion_date
+        
       FROM milestones m
       JOIN components c ON m.component_id = c.id
-      WHERE c.work_id = ?
+      WHERE m.milestone_number IS NOT NULL 
+        AND c.work_id = ?
+      GROUP BY m.milestone_number, m.milestone_name
+      ORDER BY m.milestone_number
     `, [workId]);
 
     if (rows.length === 0) {
       return res.json([]);
     }
 
-    // 🔹 total milestones for this work
-    const totalMilestones = Math.max(
-      ...rows.map(r => r.num_of_milestones)
-    );
-
-    const milestoneMap = {};
-
-    // 🔹 initialize all milestones
-    for (let i = 1; i <= totalMilestones; i++) {
-      milestoneMap[i] = {
-        milestone_number: i,
-        milestone_name: `Milestone ${i}`,
-        completed_quantity_sum: 0,
-        total_quantity_sum: 0,
-        achievement_percentage: 0,
-        status: "Not Started"
-      };
-    }
-
-    // 🔹 aggregate component data milestone-wise
-    rows.forEach(row => {
-      const m = milestoneMap[row.milestone_number];
-
-      if (!m) return;
-
-      m.completed_quantity_sum += Number(row.completed_quantity || 0);
-      m.total_quantity_sum += Number(row.total_qty || 0);
-    });
-
-    // 🔹 calculate achievement & status
-    const finalResponse = Object.values(milestoneMap).map(m => {
-      let achievement = 0;
-
-      if (m.total_quantity_sum > 0) {
-        achievement = (
-          (m.completed_quantity_sum / m.total_quantity_sum) * 100
-        ).toFixed(2);
-      }
-
-      let status = "Not Started";
-      if (achievement > 0 && achievement < 100) status = "In Progress";
-      if (achievement >= 100) status = "Completed";
+    // Format the response
+    const finalResponse = rows.map(row => {
+      // Format dates
 
       return {
-        milestone_number: m.milestone_number,
-        milestone_name: m.milestone_name,
-        achievement_percentage: Number(achievement),
-        status
+        milestone_number: row.milestone_number,
+        milestone_name: row.milestone_name,
+        milestone_qty: row.total_milestone_qty,
+        completed_quantity: row.total_completed_qty,
+        remaining_qty: row.remaining_qty,
+        achievement_percentage: row.achievement_percentage,
+        status: row.milestone_status,
+        work_start_date: row.work_start_date,
+        work_stipulated_date: row.work_stipulated_date,
+        work_actualcompletion_date: row.work_actualcompletion_date,
+        components_count: row.components_count
       };
     });
 
@@ -125,12 +140,12 @@ export const getREPMilestonesByWorkId = async (req, res) => {
   } catch (err) {
     console.error("❌ Error fetching milestone report:", err);
     res.status(500).json({
+      success: false,
       error: "Failed to fetch milestone report",
       details: err.message
     });
   }
 };
-
 export const getREPTenderByWorkId = async (req, res) => {
   const { workId } = req.params; // ✅ FIXED
 
@@ -276,5 +291,3 @@ export const getREPLengthById = async (req, res) => {
     res.status(500).json({ error: "Failed to fetch progress" });
   }
 };
-
-

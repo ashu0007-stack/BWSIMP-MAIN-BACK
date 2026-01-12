@@ -141,7 +141,7 @@ export const getPackageComponents = async (req, res) => {
   }
 };
  
-// ✅ Save overall package progress (loop over components)
+// ✅ Save overall package progress 
 export const savePackageProgress = async (req, res) => {
   const { packageNumber, progressDate, components, remark } = req.body;
  
@@ -189,7 +189,7 @@ export const savePackageProgress = async (req, res) => {
   }
 };
  
-// ✅ Get all milestones for a package (Excel format ke liye)
+// ✅ Get all milestones for a package 
 export const getPackageMilestones = async (req, res) => {
   const { pkg } = req.params;
  
@@ -313,10 +313,7 @@ export const getPackageComponentsDetailed = async (req, res) => {
   }
 };
  
-// ✅ Save milestone progress (Excel format ke hisaab se)
-// milestoneController.js में saveMilestoneProgress function update करें:
- 
-// ✅ Save milestone progress (Excel format ke hisaab se)
+// ✅ Save milestone progress
 export const saveMilestoneProgress = async (req, res) => {
   const {
     packageNumber,

@@ -514,12 +514,7 @@ export const createContract = async (req, res) => {
       await Promise.all(methodInsertPromises);
       console.log(`✅ Added ${work_methodology_data.length} work methodology records`);
     }
-
-
-
-    // Update work table to set isAwarded_flag = 1
-    await db.query(`UPDATE work SET isAwarded_flag = 1 WHERE id = ?`, [work_id]);
-     const [[{ num_of_milestones }]] = await db.query(
+const [[{ num_of_milestones }]] = await db.query(
   `SELECT num_of_milestones FROM components WHERE work_id = ? LIMIT 1`,
   [work_id]
 );
@@ -529,54 +524,103 @@ const milestoneCount = Number(num_of_milestones);
 if (!milestoneCount || milestoneCount === 0) {
   throw new Error("No milestones defined in components");
 }
-   const [milestones] = await db.query(
-  `SELECT id FROM milestones WHERE work_id = ? ORDER BY id ASC`,
+
+// Get all components for this work
+const [components] = await db.query(
+  `SELECT id, nameofcomponent, total_qty, unitname FROM components WHERE work_id = ? ORDER BY id ASC`,
   [work_id]
 );
 
-if (milestones.length === 0) {
-  throw new Error("No milestone records found");
+if (components.length === 0) {
+  throw new Error("No component records found");
 }
-  
 
 // Total duration in days
 const startDate = new Date(start_date);
 const endDate = new Date(stipulated_date);
-
-// total days
-const totalDays = Math.ceil(
-  (endDate - startDate) / (1000 * 60 * 60 * 24)
-);
-
+const totalDays = Math.ceil((endDate - startDate) / (1000 * 60 * 60 * 24));
 const daysPerMilestone = Math.floor(totalDays / milestoneCount);
 
-let milestoneStartDate = new Date(startDate);
+// Calculate milestone dates (SAME for all components)
+const milestoneDates = [];
+let currentStartDate = new Date(startDate);
 
-for (let i = 0; i < milestones.length; i++) {
-  let milestoneEndDate = new Date(milestoneStartDate);
-
-  if (i === milestones.length - 1) {
-    milestoneEndDate = new Date(endDate); // last milestone exact end date
+for (let i = 1; i <= milestoneCount; i++) {
+  let milestoneEndDate = new Date(currentStartDate);
+  
+  if (i === milestoneCount) {
+    // Last milestone gets exact end date
+    milestoneEndDate = new Date(endDate);
   } else {
-    milestoneEndDate.setDate(
-      milestoneEndDate.getDate() + daysPerMilestone
-    );
+    milestoneEndDate.setDate(milestoneEndDate.getDate() + daysPerMilestone - 1);
   }
+  
+  milestoneDates.push({
+    milestone_number: i,
+    start_date: new Date(currentStartDate),
+    end_date: new Date(milestoneEndDate),
+    duration_days: Math.ceil((milestoneEndDate - currentStartDate) / (1000 * 60 * 60 * 24)) + 1
+  });
+  
+  // Next milestone starts from next day
+  currentStartDate = new Date(milestoneEndDate);
+  currentStartDate.setDate(currentStartDate.getDate() + 1);
+}
 
-  await db.query(
-    `UPDATE milestones
-     SET work_start_date = ?,
-         work_stipulated_date = ?
-     WHERE id = ?`,
-    [
-      milestoneStartDate,
-      milestoneEndDate,
-      milestones[i].id
-    ]
-  );
 
-  // next milestone starts from next day
-  milestoneStartDate = new Date(milestoneEndDate);
+milestoneDates.forEach(m => {
+  console.log(`Milestone ${m.milestone_number}: ${m.start_date.toISOString().split('T')[0]} to ${m.end_date.toISOString().split('T')[0]} (${m.duration_days} days)`);
+});
+
+// For each component, update its milestones
+for (const component of components) {
+  console.log(`\nProcessing Component: ${component.nameofcomponent} (ID: ${component.id})`);
+  console.log(`Total Qty: ${component.total_qty} ${component.unitname}`);
+  
+  // Calculate quantity per milestone for this component
+  const qtyPerMilestone = component.total_qty / milestoneCount;
+  
+  // Update or create milestones for this component
+  for (let i = 0; i < milestoneDates.length; i++) {
+    const milestoneDate = milestoneDates[i];
+    const milestoneNumber = milestoneDate.milestone_number;
+    
+    // Calculate milestone quantity (adjust last milestone for rounding)
+    let milestoneQty;
+    if (milestoneNumber === milestoneCount) {
+      // Last milestone gets remaining quantity
+      milestoneQty = component.total_qty - (qtyPerMilestone * (milestoneCount - 1));
+    } else {
+      milestoneQty = qtyPerMilestone;
+    }
+    
+    // Check if milestone already exists
+    const [existingMilestone] = await db.query(
+      `SELECT id FROM milestones 
+       WHERE work_id = ? AND component_id = ? AND milestone_number = ?`,
+      [work_id, component.id, milestoneNumber]
+    );
+    
+    if (existingMilestone && existingMilestone.length > 0) {
+      // Update existing milestone
+      await db.query(
+        `UPDATE milestones 
+         SET work_start_date = ?,
+             work_stipulated_date = ?,
+             
+             updated_at = CURRENT_TIMESTAMP
+         WHERE id = ?`,
+        [
+          milestoneDate.start_date,
+          milestoneDate.end_date,
+      
+          existingMilestone[0].id
+        ]
+      );
+      
+      console.log(`  Updated Milestone ${milestoneNumber}: ${parseFloat(milestoneQty.toFixed(2))} ${component.unitname}`);
+    } 
+  }
 }
     res.json({ success: true, id: result.insertId });
   } catch (err) {
@@ -1095,7 +1139,7 @@ export const updateContract = async (req, res) => {
       console.log(`✅ Added ${work_methodology_data.length} work methodology records`);
     }
     
-    const [[{ num_of_milestones }]] = await db.query(
+const [[{ num_of_milestones }]] = await db.query(
   `SELECT num_of_milestones FROM components WHERE work_id = ? LIMIT 1`,
   [work_id]
 );
@@ -1121,10 +1165,6 @@ const startDate = new Date(start_date);
 const endDate = new Date(stipulated_date);
 const totalDays = Math.ceil((endDate - startDate) / (1000 * 60 * 60 * 24));
 const daysPerMilestone = Math.floor(totalDays / milestoneCount);
-
-console.log(`Contract Duration: ${totalDays} days`);
-console.log(`Milestones: ${milestoneCount}, Days per Milestone: ${daysPerMilestone}`);
-console.log(`Components: ${components.length}`);
 
 // Calculate milestone dates (SAME for all components)
 const milestoneDates = [];
@@ -1152,7 +1192,7 @@ for (let i = 1; i <= milestoneCount; i++) {
   currentStartDate.setDate(currentStartDate.getDate() + 1);
 }
 
-console.log('\nMilestone Dates:');
+
 milestoneDates.forEach(m => {
   console.log(`Milestone ${m.milestone_number}: ${m.start_date.toISOString().split('T')[0]} to ${m.end_date.toISOString().split('T')[0]} (${m.duration_days} days)`);
 });

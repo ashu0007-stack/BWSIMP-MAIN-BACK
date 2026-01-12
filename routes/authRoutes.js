@@ -1,8 +1,8 @@
 import express from "express";
-import { login } from "../controllers/auth/loginController.js";
-import { refreshAccessToken } from "../controllers/auth/refreashTokenController.js";
-import { logout } from "../controllers/auth/logoutController.js";
-import {forgotPassword,resetPassword, testToken} from "../controllers/auth/passwordController.js";
+import { login } from "../controllers/Auth/loginController.js";
+import { refreshAccessToken } from "../controllers/Auth/refreashTokenController.js";
+import { logout } from "../controllers/Auth/logoutController.js";
+import {forgotPassword,resetPassword, testToken} from "../controllers/Auth/passwordController.js";
 import { changePassword } from "../controllers/UserManagement/userController.js";
 import { auth } from "../middleware/authMiddleware.js";    
 const router = express.Router();

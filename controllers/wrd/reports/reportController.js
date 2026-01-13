@@ -291,3 +291,33 @@ export const getREPLengthById = async (req, res) => {
     res.status(500).json({ error: "Failed to fetch progress" });
   }
 };
+
+export const getREPPim = async (req, res) => {
+  try {
+    const [rows] = await db.query(`
+  select 
+w.wua_id,
+w.project_id,
+w.project_name,
+v.vlc_name,
+w.wua_name,
+w.ce_zone,
+w.se_circle,
+w.subdivision,
+w.section,
+tenure_completion_year,
+formation_year,
+s.slc_name,
+w.registration_no,
+w.status
+from wua w
+left join vlc v on w.wua_id = v.wua_id
+left join slc s on w.wua_id = s.wua_id
+    `);
+
+    res.json(rows);
+  } catch (err) {
+    console.error("❌ Error fetching works:", err);
+    res.status(500).json({ error: "Failed to fetch works", details: err.message });
+  }
+};

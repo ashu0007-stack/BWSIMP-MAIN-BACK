@@ -12,7 +12,9 @@ import {
   updateBeneficiaries,
   updateVillages,
   updateComponents,
-  getAssignedWorks
+  getAssignedWorks,
+  addSpurs,
+  getSpursByWorkId,
 } from "../controllers/wrd/workController.js";
 
 import {
@@ -42,6 +44,8 @@ router.post("/:workId/villages", auth, addVillages);
 router.put("/:workId/villages", auth, updateVillages); // NEW
 router.post("/:workId/components", auth, addComponentsAndMilestones);
 router.put("/:workId/components", auth, updateComponents); // NEW
+router.post('/:workId/spurs', addSpurs);
+router.get('/:workId/spurs', getSpursByWorkId);
 router.get("/by-division/:divisionId", auth, getWorksByDivision);
 
 // =============================

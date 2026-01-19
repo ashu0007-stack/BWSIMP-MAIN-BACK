@@ -70,13 +70,15 @@ export const createWork = async (req, res) => {
       package_number,
       Area_Under_improved_Irrigation,
       user_data,
+      has_spurs = 0,
     } = req.body;
     console.log("📦 Received data:", {
       work_name,
       work_package_name,
       workcomponentId,
       package_number,
-      target_km
+      target_km,
+      has_spurs
     });
     let dept_id, user_email, username;
 
@@ -102,8 +104,8 @@ export const createWork = async (req, res) => {
       `INSERT INTO work 
         (zone_id, circle_id, division_id, component_id, subcomponent_id, dept_id, work_name, 
          target_km, work_period_months, work_cost, package_number,
-          Area_Under_improved_Irrigation, created_by, created_email)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+          Area_Under_improved_Irrigation,has_spurs, created_by, created_email)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
       [
         zone_id,
         circle_id,
@@ -117,6 +119,7 @@ export const createWork = async (req, res) => {
         work_cost,
         package_number,
         Area_Under_improved_Irrigation,
+        has_spurs ? 1 : 0,
         username || "Unknown User",
         user_email,
       ]
@@ -145,9 +148,6 @@ export const createWork = async (req, res) => {
     });
   }
 };
-
-// =============================
-// ADD BENEFICIARIES (Updated with beneficiaries_male)
 // =============================
 export const addBeneficiaries = async (req, res) => {
   try {
@@ -324,6 +324,140 @@ export const addComponentsAndMilestones = async (req, res) => {
     res.status(500).json({ error: "Failed to add components and milestones", details: err.message });
   }
 };
+
+// =============================
+// ADD SPURS
+// =============================
+export const addSpurs = async (req, res) => {
+  try {
+    const { workId } = req.params;
+    const { spurs, user_data } = req.body;
+
+    let user_email, username;
+    if (user_data) {
+      user_email = user_data.email;
+      username = user_data.username;
+    } else {
+      user_email = req.session.user?.email || req.session.user_email;
+      username = req.session.user?.username || req.session.username;
+    }
+
+    console.log("📌 Adding spurs for workId:", workId);
+    console.log("📌 Spurs data:", spurs);
+    console.log("📌 User data:", { user_email, username });
+
+    // Check if work exists
+    const [workCheck] = await db.query("SELECT id FROM work WHERE id = ?", [workId]);
+    if (workCheck.length === 0) {
+      return res.status(404).json({ 
+        success: false,
+        error: 'WORK_NOT_FOUND',
+        message: "Work not found" 
+      });
+    }
+
+    // Validate spurs data
+    if (!spurs || !Array.isArray(spurs) || spurs.length === 0) {
+      return res.status(400).json({
+        success: false,
+        error: 'INVALID_SPURS_DATA',
+        message: "Spurs data is required and should be a non-empty array"
+      });
+    }
+
+    // Insert all spurs
+    for (const spur of spurs) {
+      // Validate required fields
+      if (!spur.spur_name || !spur.location_km || !spur.is_new) {
+        console.warn("⚠️ Skipping invalid spur data:", spur);
+        continue;
+      }
+
+      await db.query(
+        `INSERT INTO work_spurs 
+          (work_id, spur_name, location_km, is_new, created_by, created_email)
+         VALUES (?, ?, ?, ?, ?, ?)`,
+        [
+          workId,
+          spur.spur_name.trim(),
+          parseFloat(spur.location_km) || 0,
+          spur.is_new, // 'new' or 'old'
+          username || "Unknown User",
+          user_email || "unknown@example.com",
+        ]
+      );
+    }
+
+    res.json({ 
+      success: true,
+      message: "✅ Spurs added successfully",
+      count: spurs.length
+    });
+  } catch (err) {
+    console.error("❌ Error adding spurs:", err);
+    
+    // Handle duplicate entry error
+    if (err.errno === 1062) {
+      return res.status(400).json({
+        success: false,
+        error: 'DUPLICATE_SPUR_NAME',
+        message: 'A spur with this name already exists for this work.',
+        details: 'Please use a unique spur name for this work package.'
+      });
+    }
+
+    // Handle foreign key constraint error
+    if (err.errno === 1452) {
+      return res.status(400).json({
+        success: false,
+        error: 'INVALID_WORK_ID',
+        message: 'Invalid work ID. The work does not exist.',
+        details: 'Please check the work ID and try again.'
+      });
+    }
+
+    res.status(500).json({ 
+      success: false,
+      error: 'DATABASE_ERROR',
+      message: "Failed to add spurs",
+      details: err.message 
+    });
+  }
+};
+
+// =============================
+// GET SPURS BY WORK ID
+// =============================
+export const getSpursByWorkId = async (req, res) => {
+  try {
+    const { workId } = req.params;
+
+    const [spurs] = await db.query(
+      `SELECT 
+        id, spur_name, location_km, is_new, 
+        created_by, created_email, created_at
+       FROM work_spurs 
+       WHERE work_id = ? 
+       ORDER BY spur_name`,
+      [workId]
+    );
+
+    res.json({ 
+      success: true,
+      spurs,
+      count: spurs.length
+    });
+  } catch (err) {
+    console.error("❌ Error fetching spurs:", err);
+    res.status(500).json({ 
+      success: false,
+      error: 'DATABASE_ERROR',
+      message: "Failed to fetch spurs",
+      details: err.message 
+    });
+  }
+};
+
 
 export const getWorksByDivision = async (req, res) => {
   try {

@@ -326,7 +326,7 @@ getAllSLCs: async function(req, res) {
   },
 
   // Get SLC by ID with all details
-  getSLCById: async function(req, res) {
+   getSLCById: async function(req, res) {
   try {
     const { id } = req.params;
     console.log(`🔄 Fetching SLC details for ID: ${id}`);
@@ -334,7 +334,15 @@ getAllSLCs: async function(req, res) {
     // 1. Get SLC basic info
     const [slcRows] = await db.execute(`
       SELECT 
-        s.*,
+        s.slc_name,
+        s.section,
+        s.subdivision,
+        s.circle,
+        s.zone,
+        date_format(s.formation_date, '%Y-%m-%d') as formation_date,
+        date_format(s.last_election_date, '%Y-%m-%d') as last_election_date,
+        date_format(s.next_election_date, '%Y-%m-%d') as next_election_date,
+        s.status,
         w.wua_name,
         w.division_name
       FROM slc s

@@ -675,27 +675,54 @@ export const getGrievancesByProject = async (req, res) => {
 
 // ✅ Register new grievance
 export const registerGrievance = async (req, res) => {
+  console.log('📥 Grievance Request Body:', req.body);
+  
   try {
     const {
-      id,
+      project_id,  // Changed from 'id' to 'project_id'
       received_date,
       complainant_name,
       contact_number,
       category = 'other',
       description,
-      priority = 'medium'
+      priority = 'medium',
+      status = 'pending'  // Added status field
     } = req.body;
 
+    // ✅ VALIDATION: Check required fields
+    if (!project_id) {
+      return res.status(400).json({
+        success: false,
+        error: "Project ID is required"
+      });
+    }
+    
+    if (!complainant_name) {
+      return res.status(400).json({
+        success: false,
+        error: "Complainant name is required"
+      });
+    }
+    
+    if (!description) {
+      return res.status(400).json({
+        success: false,
+        error: "Description is required"
+      });
+    }
+
     // Validate project exists
+    console.log('🔍 Checking project:', project_id);
     const [project] = await db.execute(
       "SELECT id FROM work WHERE id = ?",
-      [id]
+      [project_id]  // Changed from id to project_id
     );
 
     if (project.length === 0) {
+      console.error('❌ Project not found:', project_id);
       return res.status(404).json({
         success: false,
-        error: "Project not found"
+        error: `Project with ID ${project_id} not found`
       });
     }
 
@@ -707,39 +734,72 @@ export const registerGrievance = async (req, res) => {
     );
     
     const grievance_id = `GRV-${year}-${String(parseInt(count[0].count) + 1).padStart(3, '0')}`;
+    
+    console.log('📝 Generated Grievance ID:', grievance_id);
 
     const [result] = await db.execute(
       `INSERT INTO grievances 
        (grievance_id, work_id, received_date, complainant_name, 
-        contact_number, category, description, priority, created_by) 
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+        contact_number, category, description, priority, status, created_by) 
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
       [
         grievance_id,
-        id,
+        project_id,  // Changed from id to project_id
         received_date || new Date().toISOString().split('T')[0],
         complainant_name,
-        contact_number,
+        contact_number || null,
         category,
         description,
         priority,
+        status,
         req.user?.name || 'System'
       ]
     );
 
+    console.log('✅ Grievance created with ID:', result.insertId);
+    
+    // Get the created grievance
+    const [grievance] = await db.execute(
+      "SELECT * FROM grievances WHERE id = ?",
+      [result.insertId]
+    );
+
     res.status(201).json({
       success: true,
-      data: { 
-        id: result.insertId,
-        grievance_id,
-        id
-      },
+      data: grievance[0],
       message: "Grievance registered successfully"
     });
+    
   } catch (err) {
-    console.error("Register Grievance Error:", err);
+    console.error("❌ Register Grievance Error:", err);
+    console.error("Error stack:", err.stack);
+    
+    // More specific error messages
+    if (err.code === 'ER_NO_SUCH_TABLE') {
+      return res.status(500).json({ 
+        success: false, 
+        error: "Database table 'grievances' does not exist" 
+      });
+    }
+    
+    if (err.code === 'ER_BAD_FIELD_ERROR') {
+      return res.status(500).json({ 
+        success: false, 
+        error: `Database field error: ${err.message}` 
+      });
+    }
+    
+    if (err.code === 'ER_PARSE_ERROR') {
+      return res.status(500).json({ 
+        success: false, 
+        error: "SQL syntax error" 
+      });
+    }
+    
     res.status(500).json({ 
       success: false, 
-      error: "Failed to register grievance" 
+      error: "Failed to register grievance",
+      details: err.message 
     });
   }
 };

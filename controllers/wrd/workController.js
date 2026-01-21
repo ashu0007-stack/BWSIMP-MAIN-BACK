@@ -12,6 +12,8 @@ export const getAllWorks = async (req, res) => {
     w.package_number,
     w.work_cost,
     w.target_km,
+    w.work_start_range,
+    w.work_end_range,
     w.dept_id,
     w.created_by,
     w.created_email,
@@ -65,6 +67,8 @@ export const createWork = async (req, res) => {
       work_name,
       work_package_name,
       target_km,
+      work_start_range,
+      work_end_range,
       work_period_months,
       work_cost,
       package_number,
@@ -78,6 +82,8 @@ export const createWork = async (req, res) => {
       workcomponentId,
       package_number,
       target_km,
+      work_start_range,
+      work_end_range,
       has_spurs
     });
     let dept_id, user_email, username;
@@ -103,9 +109,9 @@ export const createWork = async (req, res) => {
     const [result] = await db.query(
       `INSERT INTO work 
         (zone_id, circle_id, division_id, component_id, subcomponent_id, dept_id, work_name, 
-         target_km, work_period_months, work_cost, package_number,
+         target_km,work_start_range,work_end_range, work_period_months, work_cost, package_number,
           Area_Under_improved_Irrigation,has_spurs, created_by, created_email)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?,?, ?)`,
       [
         zone_id,
         circle_id,
@@ -115,6 +121,8 @@ export const createWork = async (req, res) => {
         dept_id,
         work_package_name,
         target_km,
+        work_start_range,
+        work_end_range,
         work_period_months || 0,
         work_cost,
         package_number,
@@ -375,12 +383,13 @@ export const addSpurs = async (req, res) => {
 
       await db.query(
         `INSERT INTO work_spurs 
-          (work_id, spur_name, location_km, is_new, created_by, created_email)
-         VALUES (?, ?, ?, ?, ?, ?)`,
+          (work_id, spur_name, location_km,spurs_length, is_new, created_by, created_email)
+         VALUES (?, ?, ?, ?, ?, ?, ?)`,
         [
           workId,
           spur.spur_name.trim(),
           parseFloat(spur.location_km) || 0,
+          spur.spurs_length,
           spur.is_new, // 'new' or 'old'
           username || "Unknown User",
           user_email || "unknown@example.com",
@@ -434,7 +443,7 @@ export const getSpursByWorkId = async (req, res) => {
 
     const [spurs] = await db.query(
       `SELECT 
-        id, spur_name, location_km, is_new, 
+        id, spur_name, location_km, spurs_length,is_new, 
         created_by, created_email, created_at
        FROM work_spurs 
        WHERE work_id = ? 
@@ -552,6 +561,8 @@ export const updateWork = async (req, res) => {
       package_number,
       work_cost,
       target_km,
+      work_start_range,
+      work_end_range,
       work_period_months,
       zone_id,
       circle_id,
@@ -574,6 +585,8 @@ export const updateWork = async (req, res) => {
         package_number = ?,
         work_cost = ?,
         target_km = ?,
+        work_start_range = ?,
+        work_end_range = ?,
         work_period_months = ?,
         zone_id = ?,
         circle_id = ?,
@@ -587,6 +600,8 @@ export const updateWork = async (req, res) => {
         package_number,
         work_cost,
         target_km,
+        work_start_range,
+        work_end_range,
         work_period_months,
         zone_id,
         circle_id,

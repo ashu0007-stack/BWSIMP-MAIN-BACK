@@ -465,14 +465,13 @@ export const toggleUserStatus = async (req, res) => {
   const { id } = req.params;
 
   try {
-    const [rows] = await db.execute("SELECT isActive FROM users WHERE id=?", [id]);
+    const [rows] = await db.execute("SELECT is_active FROM users WHERE id=?", [id]);
     if (!rows.length) return res.status(404).json({ message: "User not found" });
-
-    const newStatus = rows[0].isActive === 1 ? 0 : 1;
-    await db.execute("UPDATE users SET isActive=?, updated_at=NOW() WHERE id=?", [newStatus, id]);
+    const newStatus = rows[0].is_active === '1' ? '0' : '1';
+    await db.execute("UPDATE users SET is_active=?, updated_at=NOW() WHERE id=?", [newStatus, id]);
 
     res.json({
-      message: `User ${newStatus === 1 ? "enabled" : "disabled"} successfully`,
+      message: `User ${newStatus === '0' ? "enabled" : "disabled"} successfully`,
       isActive: newStatus,
     });
   } catch (err) {

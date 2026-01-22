@@ -34,12 +34,14 @@
 
 import express from "express";
 import { auth } from "../middleware/authMiddleware.js";
-import { createUser, getUsersList } from "../controllers/userDetails/createUserController.js";
+import { createUser, getUsersList, updateUser } from "../controllers/userDetails/userController.js";
+import { toggleUserStatus } from "../controllers/UserManagement/userController.js";
 import {getDepartments, getDepartmentById} from "../controllers/userDetails/departmentController.js";
 import { getDesignations, getDesignationsById, getDesignationsByDeptLevel } from "../controllers/userDetails/desginationController.js"
 import {getLevel, getLevelsByDeptId} from "../controllers/userDetails/levelController.js";
 import {getRoles, getRolesbyDesig} from "../controllers/userDetails/roleController.js"
-
+import { createUserValidation, updateMyProfileValidation } from "../middleware/userValidation.js";
+import { validateRequest } from "../middleware/validateRequest.js";
 const router = express.Router();
 
 // departments routes
@@ -60,7 +62,9 @@ router.get("/roles", auth, getRoles);
 router.get("/roles/by-designation/:designationId", auth, getRolesbyDesig);
 
 // create user
-router.post("/createUser", auth, createUser);
-router.get("/usersList", auth, getUsersList)
+router.post("/createUser", auth, createUserValidation, validateRequest, createUser);
+router.get("/usersList", auth, getUsersList);
+router.patch("/users/:id", auth, updateMyProfileValidation, validateRequest, updateUser);
+router.patch("/users/:id/toggle-status", auth, toggleUserStatus);
 
 export default router;

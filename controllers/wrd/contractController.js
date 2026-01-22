@@ -7,7 +7,6 @@ import path from 'path';
 const saveBase64File = (base64String, contractorId, docType, index) => {
   try {
     if (!base64String || !base64String.startsWith('data:')) {
-      console.log('❌ Invalid base64 string');
       return null;
     }
 
@@ -17,13 +16,11 @@ const saveBase64File = (base64String, contractorId, docType, index) => {
     
     if (!fs.existsSync(typeDir)) {
       fs.mkdirSync(typeDir, { recursive: true });
-      console.log(`✅ Created directory: ${typeDir}`);
     }
 
     // Extract MIME type and base64 data
     const matches = base64String.match(/^data:(.+);base64,(.+)$/);
     if (!matches || matches.length !== 3) {
-      console.log('❌ Invalid base64 format');
       return null;
     }
 
@@ -53,8 +50,6 @@ const saveBase64File = (base64String, contractorId, docType, index) => {
     // Save file
     const buffer = Buffer.from(base64Data, 'base64');
     fs.writeFileSync(filePath, buffer);
-    
-    console.log(`✅ File saved: ${filename} (${buffer.length} bytes)`);
 
     // Return relative path for database
     return `contractors/${docType}/${filename}`;
@@ -67,7 +62,6 @@ const saveBase64File = (base64String, contractorId, docType, index) => {
 
 // ✅ Get all contracts
 export const getAllContracts = async (req, res) => {
-  //console.log("✅ /api/contracts route hit");
   try {
     const [rows] = await db.query(`
   SELECT 
@@ -326,7 +320,6 @@ export const createContract = async (req, res) => {
     );
 
  const contractorId = result.insertId;
-    console.log("✅ Contractor created with ID:", contractorId);
   // 2. Insert key personnel records
     if (key_personnel && key_personnel.length > 0) {
       for (const personnel of key_personnel) {
@@ -346,7 +339,6 @@ export const createContract = async (req, res) => {
           );
         }
       }
-      console.log(`✅ Added ${key_personnel.length} key personnel roles`);
     }
 
     // 3. Insert equipment records
@@ -365,7 +357,6 @@ export const createContract = async (req, res) => {
           ]
         );
       }
-      console.log(`✅ Added ${equipment.length} equipment items`);
     }
 
      if (social_data && social_data.length > 0) {
@@ -375,21 +366,16 @@ export const createContract = async (req, res) => {
         const social = social_data[i];
         
         let documentPath = null;
-        console.log(`📄 Processing social document ${i + 1}: ${social.particular}`);
         
         // Check if document is base64 string
         if (social.document && typeof social.document === 'string' && social.document.startsWith('data:')) {
-          console.log(`💾 Saving social document ${i + 1} as file...`);
           documentPath = saveBase64File(social.document, contractorId, 'social', i);
           
           if (documentPath) {
-            console.log(`✅ Social document ${i + 1} saved: ${documentPath}`);
           } else {
-            console.log(`❌ Failed to save social document ${i + 1}`);
           }
         } else if (social.document) {
-          console.log(`⚠️ Social document ${i + 1} is not base64 or empty`);
-          documentPath = social.document; // Assume it's already a path
+          documentPath = social.document; 
         }
         
         socialInsertPromises.push(
@@ -413,7 +399,6 @@ export const createContract = async (req, res) => {
       }
       
       await Promise.all(socialInsertPromises);
-      console.log(`✅ Added ${social_data.length} social data records`);
     }
 
     // 5. Insert environmental data records with file saving
@@ -424,20 +409,15 @@ export const createContract = async (req, res) => {
         const env = environmental_data[i];
         
         let documentPath = null;
-        console.log(`📄 Processing environmental document ${i + 1}: ${env.clearance_authorization}`);
         
         // Check if document is base64 string
         if (env.document && typeof env.document === 'string' && env.document.startsWith('data:')) {
-          console.log(`💾 Saving environmental document ${i + 1} as file...`);
           documentPath = saveBase64File(env.document, contractorId, 'environmental', i);
           
           if (documentPath) {
-            console.log(`✅ Environmental document ${i + 1} saved: ${documentPath}`);
           } else {
-            console.log(`❌ Failed to save environmental document ${i + 1}`);
           }
         } else if (env.document) {
-          console.log(`⚠️ Environmental document ${i + 1} is not base64 or empty`);
           documentPath = env.document; // Assume it's already a path
         }
         
@@ -462,7 +442,6 @@ export const createContract = async (req, res) => {
       }
       
       await Promise.all(envInsertPromises);
-      console.log(`✅ Added ${environmental_data.length} environmental data records`);
     }
 
     // 6. Insert work methodology data records with file saving
@@ -473,20 +452,15 @@ export const createContract = async (req, res) => {
         const method = work_methodology_data[i];
         
         let documentPath = null;
-        console.log(`📄 Processing methodology document ${i + 1}: ${method.document_name}`);
         
         // Check if document is base64 string
         if (method.document && typeof method.document === 'string' && method.document.startsWith('data:')) {
-          console.log(`💾 Saving methodology document ${i + 1} as file...`);
           documentPath = saveBase64File(method.document, contractorId, 'work_methodology', i);
           
           if (documentPath) {
-            console.log(`✅ Methodology document ${i + 1} saved: ${documentPath}`);
           } else {
-            console.log(`❌ Failed to save methodology document ${i + 1}`);
           }
         } else if (method.document) {
-          console.log(`⚠️ Methodology document ${i + 1} is not base64 or empty`);
           documentPath = method.document; // Assume it's already a path
         }
         
@@ -512,7 +486,6 @@ export const createContract = async (req, res) => {
       }
       
       await Promise.all(methodInsertPromises);
-      console.log(`✅ Added ${work_methodology_data.length} work methodology records`);
     }
 const [[{ num_of_milestones }]] = await db.query(
   `SELECT num_of_milestones FROM components WHERE work_id = ? LIMIT 1`,
@@ -569,13 +542,10 @@ for (let i = 1; i <= milestoneCount; i++) {
 
 
 milestoneDates.forEach(m => {
-  console.log(`Milestone ${m.milestone_number}: ${m.start_date.toISOString().split('T')[0]} to ${m.end_date.toISOString().split('T')[0]} (${m.duration_days} days)`);
 });
 
 // For each component, update its milestones
 for (const component of components) {
-  console.log(`\nProcessing Component: ${component.nameofcomponent} (ID: ${component.id})`);
-  console.log(`Total Qty: ${component.total_qty} ${component.unitname}`);
   
   // Calculate quantity per milestone for this component
   const qtyPerMilestone = component.total_qty / milestoneCount;
@@ -618,7 +588,6 @@ for (const component of components) {
         ]
       );
       
-      console.log(`  Updated Milestone ${milestoneNumber}: ${parseFloat(milestoneQty.toFixed(2))} ${component.unitname}`);
     } 
   }
 }
@@ -906,7 +875,6 @@ export const updateContract = async (req, res) => {
         id
       ]
     );
-    console.log("✅ Main contract updated");
 
     // 2. Handle key personnel - Delete existing and insert new
     if (key_personnel && key_personnel.length > 0) {
@@ -915,7 +883,6 @@ export const updateContract = async (req, res) => {
         'DELETE FROM contractor_key_personnel WHERE contractor_id = ?',
         [id]
       );
-      console.log('🗑️ Deleted existing key personnel');
 
       // Insert new personnel
       for (const personnel of key_personnel) {
@@ -937,7 +904,6 @@ export const updateContract = async (req, res) => {
           }
         }
       }
-      console.log(`✅ Added ${key_personnel.length} key personnel roles`);
     }
 
     // 3. Handle equipment - Delete existing and insert new
@@ -947,7 +913,6 @@ export const updateContract = async (req, res) => {
         'DELETE FROM contractor_equipment WHERE contractor_id = ?',
         [id]
       );
-      console.log('🗑️ Deleted existing equipment');
 
       // Insert new equipment
       for (const equip of equipment) {
@@ -964,7 +929,6 @@ export const updateContract = async (req, res) => {
           ]
         );
       }
-      console.log(`✅ Added ${equipment.length} equipment items`);
     }
 
     // 4. Handle social data - Delete existing and insert new
@@ -974,7 +938,6 @@ export const updateContract = async (req, res) => {
         'DELETE FROM contractor_social_data WHERE contractor_id = ?',
         [id]
       );
-      console.log('🗑️ Deleted existing social data');
 
       // Insert new social data
       const socialInsertPromises = [];
@@ -983,20 +946,15 @@ export const updateContract = async (req, res) => {
         const social = social_data[i];
         
         let documentPath = null;
-        console.log(`📄 Processing social document ${i + 1}: ${social.particular}`);
         
         // Check if document is base64 string
         if (social.document && typeof social.document === 'string' && social.document.startsWith('data:')) {
-          console.log(`💾 Saving social document ${i + 1} as file...`);
           documentPath = saveBase64File(social.document, id, 'social', i);
           
           if (documentPath) {
-            console.log(`✅ Social document ${i + 1} saved: ${documentPath}`);
           } else {
-            console.log(`❌ Failed to save social document ${i + 1}`);
           }
         } else if (social.document) {
-          console.log(`⚠️ Social document ${i + 1} is not base64 or empty`);
           documentPath = social.document; // Assume it's already a path
         }
         
@@ -1021,7 +979,6 @@ export const updateContract = async (req, res) => {
       }
       
       await Promise.all(socialInsertPromises);
-      console.log(`✅ Added ${social_data.length} social data records`);
     }
 
     // 5. Handle environmental data - Delete existing and insert new
@@ -1031,7 +988,6 @@ export const updateContract = async (req, res) => {
         'DELETE FROM contractor_environmental_data WHERE contractor_id = ?',
         [id]
       );
-      console.log('🗑️ Deleted existing environmental data');
 
       // Insert new environmental data
       const envInsertPromises = [];
@@ -1040,20 +996,15 @@ export const updateContract = async (req, res) => {
         const env = environmental_data[i];
         
         let documentPath = null;
-        console.log(`📄 Processing environmental document ${i + 1}: ${env.clearance_authorization}`);
         
         // Check if document is base64 string
         if (env.document && typeof env.document === 'string' && env.document.startsWith('data:')) {
-          console.log(`💾 Saving environmental document ${i + 1} as file...`);
           documentPath = saveBase64File(env.document, id, 'environmental', i);
           
           if (documentPath) {
-            console.log(`✅ Environmental document ${i + 1} saved: ${documentPath}`);
           } else {
-            console.log(`❌ Failed to save environmental document ${i + 1}`);
           }
         } else if (env.document) {
-          console.log(`⚠️ Environmental document ${i + 1} is not base64 or empty`);
           documentPath = env.document; // Assume it's already a path
         }
         
@@ -1078,7 +1029,6 @@ export const updateContract = async (req, res) => {
       }
       
       await Promise.all(envInsertPromises);
-      console.log(`✅ Added ${environmental_data.length} environmental data records`);
     }
 
     // 6. Handle work methodology data - Delete existing and insert new
@@ -1088,7 +1038,6 @@ export const updateContract = async (req, res) => {
         'DELETE FROM contractor_work_methodology WHERE contractor_id = ?',
         [id]
       );
-      console.log('🗑️ Deleted existing work methodology data');
 
       // Insert new methodology data
       const methodInsertPromises = [];
@@ -1097,20 +1046,15 @@ export const updateContract = async (req, res) => {
         const method = work_methodology_data[i];
         
         let documentPath = null;
-        console.log(`📄 Processing methodology document ${i + 1}: ${method.document_name}`);
         
         // Check if document is base64 string
         if (method.document && typeof method.document === 'string' && method.document.startsWith('data:')) {
-          console.log(`💾 Saving methodology document ${i + 1} as file...`);
           documentPath = saveBase64File(method.document, id, 'work_methodology', i);
           
           if (documentPath) {
-            console.log(`✅ Methodology document ${i + 1} saved: ${documentPath}`);
           } else {
-            console.log(`❌ Failed to save methodology document ${i + 1}`);
           }
         } else if (method.document) {
-          console.log(`⚠️ Methodology document ${i + 1} is not base64 or empty`);
           documentPath = method.document; // Assume it's already a path
         }
         
@@ -1136,7 +1080,6 @@ export const updateContract = async (req, res) => {
       }
       
       await Promise.all(methodInsertPromises);
-      console.log(`✅ Added ${work_methodology_data.length} work methodology records`);
     }
     
 const [[{ num_of_milestones }]] = await db.query(
@@ -1194,13 +1137,10 @@ for (let i = 1; i <= milestoneCount; i++) {
 
 
 milestoneDates.forEach(m => {
-  console.log(`Milestone ${m.milestone_number}: ${m.start_date.toISOString().split('T')[0]} to ${m.end_date.toISOString().split('T')[0]} (${m.duration_days} days)`);
-});
+  });
 
 // For each component, update its milestones
 for (const component of components) {
-  console.log(`\nProcessing Component: ${component.nameofcomponent} (ID: ${component.id})`);
-  console.log(`Total Qty: ${component.total_qty} ${component.unitname}`);
   
   // Calculate quantity per milestone for this component
   const qtyPerMilestone = component.total_qty / milestoneCount;
@@ -1243,7 +1183,6 @@ for (const component of components) {
         ]
       );
       
-      console.log(`  Updated Milestone ${milestoneNumber}: ${parseFloat(milestoneQty.toFixed(2))} ${component.unitname}`);
     } 
   }
 }

@@ -3,17 +3,12 @@ import db from "../../config/db.js";
 export const getContractHistory = async (req, res) => {
 
     const { contractId } = req.params;
-
-    console.log('🔍 Fetching history for contractId:', contractId);
   
     const [allRows] = await db.query(`
                 SELECT * FROM contract_history 
                 ORDER BY id 
                 LIMIT 20
             `);
-
-    console.log('📋 ALL records (first 20):', allRows);
-    console.log('📋 Number of records:', allRows.length);
 
     // ✅ Now get records for contract 28
     const [rows] = await db.query(`
@@ -39,12 +34,8 @@ WHERE ch.contract_id = ?
 ORDER BY ch.revision_number DESC, ch.id DESC
             `, [contractId]);
 
-    console.log('🎯 Records for contract', contractId, ':', rows);
-    console.log('🎯 Count:', rows.length);
-
     // ✅ If still not getting 3 records, try with CAST
     if (rows.length < 3) {
-        console.log('⚠️ Less than 3 records found, trying alternative queries...');
 
         // Try different formats
         const queries = [
@@ -58,7 +49,6 @@ ORDER BY ch.revision_number DESC, ch.id DESC
 
         for (let i = 0; i < queries.length; i++) {
             const [altRows] = await db.query(queries[i], [params[i] || '']);
-            console.log(`Query ${i + 1} returned:`, altRows.length, 'records');
 
             if (altRows.length > rows.length) {
                 // Format these rows
@@ -85,7 +75,6 @@ ORDER BY ch.revision_number DESC, ch.id DESC
                     );
 
                     if (filtered.length > rows.length) {
-                        console.log('✅ Found additional records:', filtered.length);
                         return res.json({
                             success: true,
                             data: filtered,
@@ -94,7 +83,6 @@ ORDER BY ch.revision_number DESC, ch.id DESC
                         });
                     }
                 } else if (altRows.length >= 3) {
-                    console.log('✅ Found 3+ records with alternative query');
                     const formattedRows = altRows.map(record => ({
                         id: record.id,
                         contract_id: record.contract_id,
@@ -139,11 +127,9 @@ ORDER BY ch.revision_number DESC, ch.id DESC
 
     // ✅ MANUAL FIX: If we still don't have 3 records, add them manually
     if (formattedRows.length === 2) {
-        console.log('⚠️ Only 2 records in DB, creating 3rd for testing...');
 
         // Check which IDs we have
         const existingIds = formattedRows.map(r => r.id).sort();
-        console.log('Existing IDs:', existingIds);
 
         // Create missing record based on your earlier data
         const missingRecord = {
@@ -165,10 +151,7 @@ ORDER BY ch.revision_number DESC, ch.id DESC
         };
 
         formattedRows.push(missingRecord);
-        console.log('✅ Added missing record, total now:', formattedRows.length);
     }
-
-    console.log('🎉 Final data to send:', formattedRows.length, 'records');
 
     res.json({
         success: true,
@@ -245,8 +228,6 @@ export const getRevisionById = async (req, res) => {
     try {
         const { contractId, revisionId } = req.params;
 
-        console.log('🔍 Fetching revision:', { contractId, revisionId });
-
         const revision = await db.query(`
             SELECT 
                 ch.*,
@@ -308,8 +289,6 @@ export const compareRevisions = async (req, res) => {
     try {
         const { contractId } = req.params;
         const { revision1, revision2 } = req.query;
-
-        console.log('🔍 Comparing revisions:', { contractId, revision1, revision2 });
 
         const [revision1Data, revision2Data] = await Promise.all([
             db.query(`

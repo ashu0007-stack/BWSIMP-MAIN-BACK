@@ -53,7 +53,6 @@ export const getBlocks = async (req, res) => {
 export const getClusters = async (req, res) => {
   try {
     const { block } = req.query;
-    console.log("Block ID received:", block);
     const [rows] = await db.query("SELECT * FROM clusters WHERE block_id = ?", [block]);
     sendResponse(res, "Cluster records fetched successfully", rows, row => ({
       block_id: row.block_id,
@@ -98,14 +97,11 @@ export const getPanchayats = async (req, res) => {
 export const getPanchayatsByBlockId = async (req, res) => {
   try {
     const blockId = req.params.blockId;
-    console.log("Block ID received (param):", blockId, "Type:", typeof blockId);
-    
     const [rows] = await db.query(
       "SELECT * FROM grampanchayat WHERE block_id = ?",
       [parseInt(blockId)] // Convert to number
     );
     
-    console.log("Panchayats found for block", blockId, ":", rows.length);
     sendResponse(res, "Gram panchayat records fetched successfully", rows, row => ({
       gp_id: row.gp_id,
       block_id: row.block_id,
@@ -124,7 +120,6 @@ export const getPanchayatsByBlockId = async (req, res) => {
 export const getVillages = async (req, res) => {
   try {
     const { cluster } = req.query;
-    console.log("Cluster ID received:", cluster);
     const [rows] = await db.query("SELECT * FROM villages");
     sendResponse(res, "Village records fetched successfully", rows, row => ({
       // block_id: row.block_id,

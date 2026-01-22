@@ -59,7 +59,6 @@ const ensureNamedUploadDir = async (componentId, disciplineId, documentTypeId) =
 
   if (!fs.existsSync(uploadDir)) {
     fs.mkdirSync(uploadDir, { recursive: true });
-    console.log('📁 Created named upload directory:', uploadDir);
   }
 
   return {
@@ -71,19 +70,10 @@ const ensureNamedUploadDir = async (componentId, disciplineId, documentTypeId) =
 
 // 📁 Upload document with named folders and user info
 export const uploadDocumentWithNamedFolders = async (req, res) => {
-  console.log("=== UPLOAD REQUEST STARTED ===");
 
   try {
-    console.log("📦 Request received");
-    console.log("📝 Body fields:", req.body);
-    console.log("📎 File info:", req.file ? {
-      originalname: req.file.originalname,
-      size: req.file.size,
-      path: req.file.path
-    } : 'No file');
 
     if (!req.file) {
-      console.log("❌ No file in request");
       return res.status(400).json({
         success: false,
         error: "No file uploaded"
@@ -103,21 +93,7 @@ export const uploadDocumentWithNamedFolders = async (req, res) => {
       userEmail
     } = req.body;
 
-    console.log("📊 Form data received:", {
-      documentName,
-      componentId,
-      disciplineId,
-      documentTypeId,
-      versionControl,
-      isFinal,
-      remarks,
-      userId,
-      userName,
-      userEmail
-    });
-
     if (!documentName) {
-      console.log("❌ Missing documentName");
       return res.status(400).json({
         success: false,
         error: "Document name is required"
@@ -125,7 +101,6 @@ export const uploadDocumentWithNamedFolders = async (req, res) => {
     }
 
     if (!documentTypeId) {
-      console.log("❌ Missing documentTypeId");
       return res.status(400).json({
         success: false,
         error: "Document type is required"
@@ -151,9 +126,6 @@ export const uploadDocumentWithNamedFolders = async (req, res) => {
     const fileNameWithVersion = `${sanitizedDocumentName}_${versionControl || 'R0'}_${currentDate}${fileExtension}`;
     const filePath = path.join(uploadDir, fileNameWithVersion);
     const fileNameWithTimestamp = `${fileNameWithVersion}`;
-    console.log("💾 Moving file to:", filePath);
-    console.log("📝 Generated filename:", fileNameWithTimestamp);
-
 
     // Move file from temp to structured folder
     fs.renameSync(req.file.path, filePath);
@@ -162,26 +134,6 @@ export const uploadDocumentWithNamedFolders = async (req, res) => {
     const fileSize = req.file.size;
     const fileName = req.file.originalname;
     const originalFileName = req.file.originalname;
-
-    console.log("💾 File details:", {
-      fileName,
-      fileSize: `${(fileSize / 1024 / 1024).toFixed(2)} MB`,
-      fileExtension,
-      filePath
-    });
-
-    // Test database connection first
-    console.log("🔌 Testing database connection...");
-    try {
-      const [dbTest] = await db.query('SELECT 1 as test');
-      console.log("✅ Database connection successful");
-    } catch (dbError) {
-      console.error("❌ Database connection failed:", dbError);
-      throw new Error(`Database connection failed: ${dbError.message}`);
-    }
-
-    // Insert into database with user info
-    console.log("💾 Inserting document into database...");
 
     const [result] = await db.query(
       `INSERT INTO documents (
@@ -217,8 +169,6 @@ export const uploadDocumentWithNamedFolders = async (req, res) => {
       ]
     );
 
-    console.log("✅ Database insert successful, ID:", result.insertId);
-
     res.json({
       success: true,
       message: "Document uploaded successfully with folder structure",
@@ -228,19 +178,13 @@ export const uploadDocumentWithNamedFolders = async (req, res) => {
       uploadedBy: uploadedBy
     });
 
-    console.log("=== UPLOAD REQUEST COMPLETED SUCCESSFULLY ===");
-
   } catch (err) {
-    console.error("❌ UPLOAD ERROR:", err);
-    console.error("Error stack:", err.stack);
 
     // Delete uploaded file if database operation failed
     if (req.file && fs.existsSync(req.file.path)) {
       try {
         fs.unlinkSync(req.file.path);
-        console.log("🗑️ Deleted uploaded file due to error");
       } catch (unlinkError) {
-        console.error("Failed to delete file:", unlinkError);
       }
     }
 
@@ -261,11 +205,6 @@ export const createShareLink = async (req, res) => {
       expiresInHours = 24,
       userId
     } = req.body;
-
-    console.log("🔗 Creating share link for document:", documentId);
-    console.log("📧 Sharing with:", userEmail);
-    console.log("🎯 Permission type:", permissionType);
-    console.log("👤 Received user ID:", userId);
 
     // Validate required fields
     if (!userEmail) {
@@ -293,12 +232,9 @@ export const createShareLink = async (req, res) => {
         const [userRows] = await db.query("SELECT id FROM users WHERE id = ?", [userId]);
         if (userRows.length > 0) {
           createdBy = parseInt(userId);
-          console.log("✅ Valid user found, created_by:", createdBy);
         } else {
-          console.warn("⚠️ User ID not found in database, using default:", userId);
         }
       } catch (userError) {
-        console.warn("⚠️ Could not validate user, using default:", userError.message);
       }
     } else {
       // If no userId provided, try to find an admin user
@@ -306,14 +242,10 @@ export const createShareLink = async (req, res) => {
         const [adminRows] = await db.query("SELECT id FROM users WHERE role = 'admin' OR role = 'user' LIMIT 1");
         if (adminRows.length > 0) {
           createdBy = adminRows[0].id;
-          console.log("👨‍💼 Using admin user ID:", createdBy);
         }
       } catch (adminError) {
-        console.warn("⚠️ Could not find admin user, using default ID 1");
       }
     }
-
-    console.log("👤 Final created_by value:", createdBy);
 
     // Generate unique token
     const shareToken = generateShareToken();
@@ -345,10 +277,6 @@ export const createShareLink = async (req, res) => {
 
     const shareUrl = `${process.env.FRONTEND_URL || 'http://localhost:3000'}/shared/${shareToken}`;
 
-    console.log("✅ Share link created successfully");
-    console.log("🔗 Share URL:", shareUrl);
-    console.log("👤 Created by user ID:", createdBy);
-
     res.json({
       success: true,
       message: "Share link created successfully",
@@ -360,7 +288,6 @@ export const createShareLink = async (req, res) => {
     });
 
   } catch (err) {
-    console.error("❌ Create share link error:", err);
 
     res.status(500).json({
       success: false,
@@ -372,8 +299,6 @@ export const createShareLink = async (req, res) => {
 export const validateShareToken = async (req, res) => {
   try {
     const { token } = req.params;
-
-    console.log("🔍 Validating share token:", token);
 
     const [permissionRows] = await db.query(
       `SELECT 
@@ -423,7 +348,6 @@ export const validateShareToken = async (req, res) => {
     });
 
   } catch (err) {
-    console.error("❌ Validate token error:", err);
     res.status(500).json({
       success: false,
       error: err.message
@@ -435,8 +359,6 @@ export const validateShareToken = async (req, res) => {
 export const downloadSharedDocument = async (req, res) => {
   try {
     const { token } = req.params;
-
-    console.log("📥 Download request for shared document:", token);
 
     const [permissionRows] = await db.query(
       `SELECT 
@@ -477,9 +399,6 @@ export const downloadSharedDocument = async (req, res) => {
     const fileStream = fs.createReadStream(filePath);
     fileStream.pipe(res);
 
-    // Log download activity
-    console.log(`📝 Access log: Document ${permission.document_id} downloaded via share token`);
-
   } catch (err) {
     console.error("❌ Download shared document error:", err);
     res.status(500).json({
@@ -493,8 +412,6 @@ export const downloadSharedDocument = async (req, res) => {
 export const viewSharedDocument = async (req, res) => {
   try {
     const { token } = req.params;
-
-    console.log("👁️ View request for shared document:", token);
 
     const [permissionRows] = await db.query(
       `SELECT 
@@ -530,11 +447,7 @@ export const viewSharedDocument = async (req, res) => {
     // For viewing, we serve the file directly
     res.sendFile(path.resolve(filePath));
 
-    // Log view activity
-    console.log(`📝 Access log: Document ${permission.document_id} viewed via share token`);
-
   } catch (err) {
-    console.error("❌ View shared document error:", err);
     res.status(500).json({
       success: false,
       error: err.message
@@ -546,8 +459,6 @@ export const viewSharedDocument = async (req, res) => {
 export const getDocumentPermissions = async (req, res) => {
   try {
     const { documentId } = req.params;
-
-    console.log("📋 Fetching permissions for document:", documentId);
 
     // Check if document exists
     const [docRows] = await db.query("SELECT id FROM documents WHERE id = ?", [documentId]);
@@ -576,8 +487,6 @@ export const getDocumentPermissions = async (req, res) => {
       ORDER BY dp.created_at DESC`,
       [documentId]
     );
-
-    console.log(`✅ Found ${permissionRows.length} permissions for document ${documentId}`);
 
     res.json({
       success: true,
@@ -627,15 +536,12 @@ export const revokePermission = async (req, res) => {
 // 📊 Get master data for dropdowns - Return objects with IDs
 export const getMasterData = async (req, res) => {
   try {
-    console.log("🎯 Fetching master data...");
-
     // Get components with IDs
     let components = [];
     try {
       const [componentRows] = await db.query("SELECT id, component_name FROM package_component");
       components = componentRows;
     } catch (e) {
-      console.warn("⚠️ Could not fetch components:", e.message);
       components = [];
     }
 
@@ -645,7 +551,6 @@ export const getMasterData = async (req, res) => {
       const [disciplineRows] = await db.query("SELECT id, component_id, discipline_name FROM disciplines");
       disciplines = disciplineRows;
     } catch (e) {
-      console.warn("⚠️ Could not fetch disciplines:", e.message);
       disciplines = [];
     }
 
@@ -655,7 +560,6 @@ export const getMasterData = async (req, res) => {
       const [typeRows] = await db.query("SELECT id, type_name FROM document_types");
       documentTypes = typeRows;
     } catch (e) {
-      console.warn("⚠️ Could not fetch document types:", e.message);
       documentTypes = [];
     }
 
@@ -667,7 +571,6 @@ export const getMasterData = async (req, res) => {
     };
     res.json(masterData);
   } catch (err) {
-    console.error("❌ Master data fetch error:", err);
     res.status(500).json({
       success: false,
       error: err.message
@@ -678,7 +581,6 @@ export const getMasterData = async (req, res) => {
 // 📄 Get all documents - Include IDs in response
 export const getDocuments = async (req, res) => {
   try {
-    console.log("📋 Fetching documents...");
 
     const [rows] = await db.query(
       `SELECT 
@@ -707,8 +609,6 @@ export const getDocuments = async (req, res) => {
       LEFT JOIN document_types dt ON d.document_type_id = dt.id
       ORDER BY d.upload_date DESC`
     );
-
-    console.log(`✅ Found ${rows.length} documents`);
     res.json(rows);
   } catch (err) {
     console.error("❌ Fetch error:", err);
@@ -723,7 +623,6 @@ export const getDocuments = async (req, res) => {
 export const searchDocuments = async (req, res) => {
   try {
     const { query } = req.query;
-    console.log(`🔍 Searching documents for: ${query}`);
 
     const [rows] = await db.query(
       `SELECT 
@@ -754,8 +653,6 @@ export const searchDocuments = async (req, res) => {
       ORDER BY d.upload_date DESC`,
       [`%${query}%`, `%${query}%`, `%${query}%`, `%${query}%`, `%${query}%`]
     );
-
-    console.log(`✅ Search found ${rows.length} documents`);
     res.json(rows);
   } catch (err) {
     console.error("❌ Search error:", err);
@@ -770,7 +667,6 @@ export const searchDocuments = async (req, res) => {
 export const deleteDocument = async (req, res) => {
   try {
     const { id } = req.params;
-    console.log("🗑️ Deleting document ID:", id);
 
     const [rows] = await db.query("SELECT file_path FROM documents WHERE id = ?", [id]);
 
@@ -779,15 +675,12 @@ export const deleteDocument = async (req, res) => {
 
       if (filePath && fs.existsSync(filePath)) {
         fs.unlinkSync(filePath);
-        console.log("✅ Deleted file:", filePath);
       }
 
       await db.query("DELETE FROM documents WHERE id = ?", [id]);
-      console.log("✅ Deleted database record");
 
       res.json({ success: true, message: "Document deleted successfully" });
     } else {
-      console.log("❌ Document not found for deletion");
       res.status(404).json({ success: false, error: "Document not found" });
     }
   } catch (err) {
@@ -803,7 +696,6 @@ export const deleteDocument = async (req, res) => {
 export const getDocumentById = async (req, res) => {
   try {
     const { id } = req.params;
-    console.log("📄 Getting document by ID:", id);
 
     const [rows] = await db.query(
       `SELECT 
@@ -835,11 +727,9 @@ export const getDocumentById = async (req, res) => {
     );
 
     if (rows.length === 0) {
-      console.log("❌ Document not found");
       return res.status(404).json({ success: false, error: "Document not found" });
     }
 
-    console.log("✅ Document found");
     res.json(rows[0]);
   } catch (err) {
     console.error("❌ Get document error:", err);
@@ -852,8 +742,6 @@ export const getDocumentById = async (req, res) => {
 export const testSharedRoute = async (req, res) => {
   try {
     const { token } = req.params;
-
-    console.log("✅ Test route called with token:", token);
 
     res.json({
       success: true,

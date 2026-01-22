@@ -17,7 +17,6 @@ const farmersController = {
   // ✅ Get All Farmers - FIXED VERSION
   getAllFarmers: async function(req, res) {
     try {
-      console.log(`🚀 getAllFarmers function called!`);
 
       // Simple query without complex transformation first
       const [farmers] = await db.execute(`
@@ -46,8 +45,6 @@ const farmersController = {
         ORDER BY wm.wua_name, v.village_name, gm.name ASC
       
       `);
-
-      console.log(`✅ Found ${farmers.length} farmers`);
 
       // ✅ SIMPLE TRANSFORMATION - No this.parseLandSize
       const transformedFarmers = farmers.map(farmer => ({
@@ -106,7 +103,6 @@ const farmersController = {
   // ✅ Get Farmers Statistics - SIMPLE VERSION
   getFarmersStatistics: async function(req, res) {
     try {
-      console.log(`📊 getFarmersStatistics called`);
 
       // Total Farmers Count
       const [totalCount] = await db.execute('SELECT COUNT(*) as total FROM vlc_gb_members');
@@ -162,8 +158,6 @@ const farmersController = {
   getFarmerById: async function(req, res) {
     try {
       const { id } = req.params;
-      console.log(`🔍 getFarmerById called for ID: ${id}`);
-
       const [farmer] = await db.execute(`
         SELECT 
           gm.*,
@@ -203,8 +197,6 @@ const farmersController = {
   // ✅ Get WUA Coverage Statistics from wua_master
 getWUACoverageStats: async function(req, res) {
   try {
-    console.log(`📊 Fetching WUA coverage statistics...`);
-
     const [stats] = await db.execute(`
       SELECT 
         COUNT(DISTINCT wm.id) as total_wuas,

@@ -163,8 +163,6 @@ const createWorkLog = async (req, res) => {
     
     const user_id = req.user?.id;
     
-    console.log('Creating NEW work log for data_entry_id:', data_entry_id);
-    
     // Validate required fields
     if (!data_entry_id || !agency_name) {
       return res.status(400).json({
@@ -221,8 +219,6 @@ const createWorkLog = async (req, res) => {
         user_id
       ]
     );
-    
-    console.log('New work log created with ID:', result.insertId, 'Log number:', logNumber);
     
     // Fetch the created record
     const [newRows] = await db.execute(
@@ -296,8 +292,6 @@ const createOrUpdateWorkLog = async (req, res) => {
     
     const user_id = req.user?.id;
     
-    console.log('createOrUpdateWorkLog - Creating NEW log for data_entry_id:', data_entry_id);
-    
     // Validate required fields
     if (!data_entry_id || !agency_name) {
       return res.status(400).json({
@@ -354,8 +348,6 @@ const createOrUpdateWorkLog = async (req, res) => {
         user_id
       ]
     );
-    
-    console.log('New log created. Total logs for data_entry_id', data_entry_id, ':', logNumber);
     
     // Fetch the created record
     const [newRows] = await db.execute(

@@ -5,7 +5,6 @@ export const dashboardController = {
   // Get comprehensive dashboard data
   getDashboardData: async function(req, res) {
     try {
-      console.log("📊 Fetching dynamic dashboard data...");
       
       // Get WUAs with completion status
       const [wuaRows] = await db.execute(`
@@ -53,8 +52,6 @@ export const dashboardController = {
       // Get performance metrics
       const performance = await getPerformanceMetrics();
       
-      console.log(`✅ Dashboard data fetched: ${wuaRows.length} WUAs`);
-      
       res.json({
         success: true,
         data: {
@@ -79,7 +76,6 @@ export const dashboardController = {
   // Get dashboard KPIs only
   getDashboardKPIs: async function(req, res) {
     try {
-      console.log("📈 Fetching dashboard KPIs...");
       
       const [wuaRows] = await db.execute(`
         SELECT 
@@ -163,7 +159,6 @@ export const dashboardController = {
   // Get completion distribution
   getCompletionDistribution: async function(req, res) {
     try {
-      console.log("📊 Fetching completion distribution...");
       
       const [distribution] = await db.execute(`
         SELECT 
@@ -225,7 +220,6 @@ export const dashboardController = {
   // Get recent activities
   getRecentActivities: async function(req, res) {
   try {
-    console.log("📝 Fetching recent activities...");
     
     const [activities] = await db.execute(`
       WITH 
@@ -309,7 +303,6 @@ export const dashboardController = {
   // Get performance metrics
   getPerformanceMetrics: async function(req, res) {
     try {
-      console.log("📊 Fetching performance metrics...");
       
       // Calculate various performance metrics
       const [metrics] = await db.execute(`

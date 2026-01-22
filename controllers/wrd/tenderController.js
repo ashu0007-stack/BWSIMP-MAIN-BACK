@@ -61,11 +61,6 @@ export const getAllTenders = async (req, res) => {
   try {
     const { search = '', page = 1, limit = 10 } = req.query;
     const offset = (page - 1) * limit;
-
-    // Debug: Log the incoming request
-    //console.log(`🔍 getAllTenders called with: search="${search}", page=${page}, limit=${limit}`);
-
-    // Use LEFT JOIN to get division and work names
     const [rows] = await db.query(
       `
       SELECT 
@@ -98,19 +93,6 @@ export const getAllTenders = async (req, res) => {
       ]
     );
 
-    // Debug: Log the results
-    // console.log(`✅ Found ${rows.length} tenders`);
-    // if (rows.length > 0) {
-    //   console.log('📊 First tender details:', {
-    //     id: rows[0].id,
-    //     division_name: rows[0].division_name,
-    //     work_name: rows[0].work_name,
-    //     division_id: rows[0].division_id,
-    //     work_id: rows[0].work_id,
-    //     tenderRefNo: rows[0].tenderRefNo
-    //   });
-    // }
-
     res.json({
       success: true,
       page: Number(page),
@@ -133,8 +115,6 @@ export const getTenderByWorkId1 = async (req, res) => {
   try {
     const { work_id } = req.params;
 
-    console.log(`🔍 getTenderByWorkId called for work_id: ${work_id}`);
-
     const [rows] = await db.query(
      `
      SELECT 
@@ -152,8 +132,6 @@ export const getTenderByWorkId1 = async (req, res) => {
       `,
       [work_id]
     );
-
-    console.log(`✅ Found ${rows.length} tenders for work_id ${work_id}`);
     
     if (!rows.length) {
       return res.status(404).json({
@@ -243,8 +221,6 @@ export const saveTender = async (req, res) => {
   try {
     const userId = req.user?.id || null;
     const userName = req.user?.username || 'Guest';
-    console.log("📋 Received tender data:", req.body);
-    
     const {
       id,
       status = 'draft',
@@ -276,9 +252,6 @@ export const saveTender = async (req, res) => {
       work_order_no,
       work_cost
     } = req.body;
-
-    // Debug: Check the status value
-    console.log('Status value:', status, 'Type:', typeof status, 'Is array?', Array.isArray(status));
     
     // Extract file names
     const newspaperFile = getFile(req, 'newspaper_file');
@@ -322,9 +295,7 @@ export const saveTender = async (req, res) => {
     // ===== DETERMINE ACTION TYPE =====
     let actionType = action_type;
     
-    if (!actionType) {
-      console.log(`🔍 Determining action type. ID: ${id}, Status: ${status}`);
-      
+    if (!actionType) {     
       // Handle array status
       let statusValue = status;
       if (Array.isArray(statusValue)) {
@@ -334,32 +305,22 @@ export const saveTender = async (req, res) => {
       if (statusValue === 'finalized' || statusValue === 'SUBMITTED') {
         actionType = 'FINAL_SUBMIT';
         
-        console.log('✅ Action type: FINAL_SUBMIT',work_id);
-        
       } else if (statusValue === 'draft') {
         if (id) {
           const [draftLogs] = await db.query(
             `SELECT COUNT(*) as count FROM tender_log WHERE tender_id = ? AND action_type IN ('DRAFT_SAVE', 'UPDATE')`,
             [id]
-          );
-          
-          console.log(`📊 Found ${draftLogs[0].count} previous draft logs for tender ${id}`);
-          
+          );                  
           if (draftLogs[0].count > 0) {
             actionType = 'UPDATE';
-            console.log('✅ Action type: UPDATE (updating existing draft)');
           } else {
             actionType = 'DRAFT_SAVE';
-            console.log('✅ Action type: DRAFT_SAVE (first draft save)');
           }
         } else {
           actionType = 'DRAFT_SAVE';
-          console.log('✅ Action type: DRAFT_SAVE (new tender)');
         }
       }
     }
-    
-    console.log(`🎯 Final action type: ${actionType}`);
 
     let logData = {};
     let tenderId = id;
@@ -374,8 +335,6 @@ export const saveTender = async (req, res) => {
     if (actionType === 'FINAL_SUBMIT') {
       finalStatus = 'finalized';
     }
-    
-    console.log(`📊 Final status: ${finalStatus}`);
 
     if (id) {
       // ===== UPDATE Existing Tender =====
@@ -466,43 +425,6 @@ export const saveTender = async (req, res) => {
           updatedAt = CURRENT_TIMESTAMP
         WHERE id = ?
       `;
-
-      console.log('Update values:', [
-        division_id,
-        work_id,
-        tender_ref_no,
-        authority,
-        emdfee || null,
-        bid_security || null,
-        validity || null,
-        nameofpiu || '',
-        newsprno || '',
-        agreement_number || '',
-        remark || '',
-        newsdate || null,
-        nitDate || null,
-        finalNit || null,
-        saleStartDate || null,
-        finalSale || null,
-        preBidDate || null,
-        finalPreBid || null,
-        corrigendumDate || null,
-        finalCorrigendum || null,
-        bidReceiptDate || null,
-        finalBids || null,
-        techBidopeningDate || null,
-        finalTechOpen || null,
-        techBidevaluationDate || null,
-        finalTechEval || null,
-        finalFinancialEval || null,
-        loa_date || null,
-        finalLoa || null,
-        finalContract || null,
-        finalNewspaper || null,
-        finalStatus,
-        id
-      ]);
-
       await db.query(updateQuery, [
         division_id,
         work_id,
@@ -538,8 +460,6 @@ export const saveTender = async (req, res) => {
         finalStatus,
         id
       ]);
-
-      console.log(`✅ Tender ID ${id} updated successfully. Action: ${actionType}, Status: ${finalStatus}`);
      
       // ===== UPDATE WORK ORDER TABLE FOR FINAL_SUBMIT =====
       if (actionType === 'FINAL_SUBMIT') {
@@ -554,7 +474,6 @@ export const saveTender = async (req, res) => {
             
             const [workOrderResult] = await db.query(updateWorkOrderQuery, [work_id]);
             if (workOrderResult.affectedRows > 0) {
-              console.log(`✅ work_orders table updated: ${workOrderResult.affectedRows} row(s) affected`);
               workOrderUpdated = true;
               logData.work_order_updated = true;
               logData.work_order_no = work_order_no;
@@ -569,7 +488,6 @@ export const saveTender = async (req, res) => {
             
             const [workOrderResult] = await db.query(updateByWorkIdQuery, [work_id]);
             if (workOrderResult.affectedRows > 0) {
-              console.log(`✅ work_orders table updated by work_id: ${workOrderResult.affectedRows} row(s) affected`);
               workOrderUpdated = true;
               logData.work_order_updated = true;
               logData.work_id = work_id;
@@ -587,7 +505,6 @@ export const saveTender = async (req, res) => {
             
             const [workOrderResult] = await db.query(updateByTenderRefQuery, [tender_ref_no]);
             if (workOrderResult.affectedRows > 0) {
-              console.log(`✅ work_orders table updated by tender_ref: ${workOrderResult.affectedRows} row(s) affected`);
               workOrderUpdated = true;
               logData.work_order_updated = true;
               logData.tender_ref_no = tender_ref_no;
@@ -609,12 +526,10 @@ export const saveTender = async (req, res) => {
               work_id || null,
               tender_ref_no || null
             ]);
-            console.log(`✅ Work cost updated: ${costResult.affectedRows} row(s) affected`);
             logData.work_cost_updated = work_cost;
           }
           
           if (!workOrderUpdated) {
-            console.log(`ℹ️ No matching work order found or already updated`);
           }
           
         } catch (workOrderError) {
@@ -668,9 +583,6 @@ export const saveTender = async (req, res) => {
           contract: finalContract
         }
       };
-
-      // Insert new tender
-      console.log(`📊 Using status for INSERT: ${finalStatus}`);
       
       const insertQuery = `
         INSERT INTO tenderdetails (
@@ -748,16 +660,9 @@ export const saveTender = async (req, res) => {
         finalStatus,
         userId,
         created_by
-      ];
-
-      // Debug: Log the values to ensure count matches
-      console.log(`📊 Column count: 36, Value count: ${insertValues.length}`);
-      console.log('Insert values:', insertValues);
-      
+      ];     
       const [result] = await db.query(insertQuery, insertValues);
-
       tenderId = result.insertId;
-      console.log(`✅ New tender created with ID: ${tenderId}. Action: ${actionType}`);
     }
 
     // ===== Create Log AFTER tender is saved =====
@@ -818,10 +723,7 @@ export const finalSubmitTender = async (req, res) => {
     const { tenderId } = req.params;
     const { work_order_no, work_id, tender_ref_no } = req.body;
     const userId = req.user?.id || null;
-    const userName = req.user?.username || 'Guest';
-    
-    console.log(`🚀 Final Submit endpoint called for tender: ${tenderId}`);
-    
+    const userName = req.user?.username || 'Guest';   
     if (!tenderId) {
       return res.status(400).json({
         success: false,
@@ -845,9 +747,6 @@ export const finalSubmitTender = async (req, res) => {
         message: `Tender with ID ${tenderId} not found`
       });
     }
-    
-    console.log(`✅ tenderdetails updated for ID: ${tenderId}`);
-    
     // ===== 2. UPDATE work_orders table =====
     let workOrderUpdated = false;
     
@@ -859,7 +758,6 @@ export const finalSubmitTender = async (req, res) => {
       );
       if (result1.affectedRows > 0) {
         workOrderUpdated = true;
-        console.log(`✅ work_orders updated by work_order_no: ${work_order_no}`);
       }
     }
     
@@ -870,7 +768,6 @@ export const finalSubmitTender = async (req, res) => {
       );
       if (result2.affectedRows > 0) {
         workOrderUpdated = true;
-        console.log(`✅ work_orders updated by work_id: ${work_id}`);
       }
     }
     
@@ -881,14 +778,9 @@ export const finalSubmitTender = async (req, res) => {
       );
       if (result3.affectedRows > 0) {
         workOrderUpdated = true;
-        console.log(`✅ work_orders updated by tender_ref_no: ${tender_ref_no}`);
       }
     }
-    
-    if (!workOrderUpdated) {
-      console.log(`ℹ️ No matching work order found or already updated`);
-    }
-    
+
     // ===== 3. CREATE LOG =====
     const logData = {
       action_type: 'FINAL_SUBMIT',
@@ -902,9 +794,7 @@ export const finalSubmitTender = async (req, res) => {
       }
     };
     
-    await createTenderLog(tenderId, 'FINAL_SUBMIT', logData, userId, userName);
-    console.log(`✅ Final submit completed successfully for tender: ${tenderId}`);
-   
+    await createTenderLog(tenderId, 'FINAL_SUBMIT', logData, userId, userName);  
     res.json({
       success: true,
       message: 'Tender finalized and submitted successfully',

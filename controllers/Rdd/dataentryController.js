@@ -753,8 +753,6 @@ export const updateDataEntryStatus = async (req, res) => {
     const { id } = req.params;
     const { status } = req.body;
 
-    console.log("Status update request:", { id, status });
-
     // Validate status
     const validStatuses = ['pending', 'Approved', 'Ongoing', 'complete', 'Suspended'];
     if (!validStatuses.includes(status)) {

@@ -32,14 +32,12 @@ export const getSubcomponentsByComponentId = async (req, res) => {
 export const getSubworkcomponentsByworkComponentId = async (req, res) => {
   try {
     const { workcomponentId } = req.params;
-    console.log("Fetching subworkcomponents for work_component_id:", workcomponentId);
     
     const [rows] = await db.execute(
       "SELECT id, work_package_name, work_component_id,length_of_work,package_number FROM work_package_component WHERE work_component_id = ? ORDER BY work_package_name",
       [workcomponentId]
     );
     
-    console.log("Subworkcomponents found:", rows.length);
     res.json(rows);
   } catch (err) {
     console.error("Subworkcomponents Error:", err);

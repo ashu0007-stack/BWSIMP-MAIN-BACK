@@ -44,7 +44,6 @@ const validateUsername = (username) => {
    ✅ CREATE USER (with validation)
 ====================================================== */
 export const createUser = async (req, res) => {
-  console.log("📥 Received Data:", req.body);
 
   let {
     employeeId,
@@ -70,7 +69,6 @@ export const createUser = async (req, res) => {
   // 🔒 CRITICAL: Force department for Admin users (prevent frontend manipulation)
   if (userRole === "admin") {
     dept_id = userDept; // Override whatever was sent from frontend
-    console.log(`🔐 Admin detected: Forcing dept_id to ${userDept}`);
   }
 
   // 🔍 Field Validation
@@ -269,13 +267,10 @@ export const createUser = async (req, res) => {
       };
 
       await transporter.sendMail(mailOptions);
-      console.log("📧 Email sent successfully");
     } catch (emailErr) {
       console.error("❌ Email sending failed:", emailErr);
       // Don't fail user creation if email fails
     }
-
-    console.log("✅ User created successfully with ID:", result.insertId);
     res.status(201).json({
       message: "User created successfully",
       userId: result.insertId,

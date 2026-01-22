@@ -192,7 +192,6 @@ export const getProgressByPackage = async (req, res) => {
 // 4️⃣ Add progress entry (✅ fixed payload issue)
 export const addProgressEntry = async (req, res) => {
   try {
-    console.log("🟢 Received body:", req.body); // 👀 debug log
 
     let { packageNumber, startKm, endKm, earthworkDoneKm, liningDoneKm, progressDate } = req.body;
     if (!packageNumber) return res.status(400).json({ error: "packageNumber is required" });

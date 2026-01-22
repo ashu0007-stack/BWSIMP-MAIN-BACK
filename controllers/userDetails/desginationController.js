@@ -103,7 +103,6 @@ export const getDesignationsByDeptLevel = async (req, res) => {
   try {
     const departmentId = Number(req.query.departmentId);
     const levelId = Number(req.query.levelId);
-    console.log(`department id, ${departmentId}, level id ${levelId}`)
 
     if (!Number.isInteger(departmentId)) {
       return res.status(400).json({

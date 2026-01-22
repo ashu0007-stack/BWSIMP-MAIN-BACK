@@ -27,9 +27,6 @@ export const detectManipulationAttempt = async (req, res, next) => {
         severity: "HIGH",
         timestamp: new Date(),
       };
-
-      console.log("🚨 SECURITY ALERT: Department manipulation detected!", suspiciousActivity);
-
       // Log to database (create this table if it doesn't exist)
       try {
         await db.execute(
@@ -115,7 +112,6 @@ export const validateRequestSource = (req, res, next) => {
   ].filter(Boolean);
 
   if (origin && !allowedOrigins.some((allowed) => origin.includes(allowed))) {
-    console.log("⚠️ Suspicious origin detected:", origin);
   }
 
   next();

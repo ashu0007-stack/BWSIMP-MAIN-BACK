@@ -76,28 +76,16 @@ export const createWork = async (req, res) => {
       user_data,
       has_spurs = 0,
     } = req.body;
-    console.log("📦 Received data:", {
-      work_name,
-      work_package_name,
-      workcomponentId,
-      package_number,
-      target_km,
-      work_start_range,
-      work_end_range,
-      has_spurs
-    });
     let dept_id, user_email, username;
 
     if (user_data) {
       dept_id = user_data.dept_id;
       user_email = user_data.email;
       username = user_data.username;
-      console.log("✅ Using user data from request body");
     } else {
       dept_id = req.session.userDetails?.dept_id || req.session.dept_id;
       user_email = req.session.userDetails?.email || req.session.user_email;
       username = req.session.userDetails?.username || req.session.username;
-      console.log("⚠️ Using session data as fallback");
     }
 
     if (!dept_id || !user_email) {
@@ -349,10 +337,6 @@ export const addSpurs = async (req, res) => {
       user_email = req.session.user?.email || req.session.user_email;
       username = req.session.user?.username || req.session.username;
     }
-
-    console.log("📌 Adding spurs for workId:", workId);
-    console.log("📌 Spurs data:", spurs);
-    console.log("📌 User data:", { user_email, username });
 
     // Check if work exists
     const [workCheck] = await db.query("SELECT id FROM work WHERE id = ?", [workId]);
@@ -893,9 +877,6 @@ export const getAssignedWorks = async (req, res) => {
     
     // Add ORDER BY
     query += ` ORDER BY w.package_number asc`;
-    
-    // console.log('Final Query:', query);
-    // console.log('Query Params:', params);
     
     // Execute query
     const [works] = await db.query(query, params);

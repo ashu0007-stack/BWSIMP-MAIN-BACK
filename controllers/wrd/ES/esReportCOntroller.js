@@ -215,7 +215,6 @@ export const getEnvironmentalDataByProject = async (req, res) => {
     `;
     
     const params = [id];
-    console.log("ssss",id)
     if (startDate && endDate) {
       sql += ' AND ed.reporting_date BETWEEN ? AND ?';
       params.push(startDate, endDate);
@@ -675,7 +674,6 @@ export const getGrievancesByProject = async (req, res) => {
 
 // ✅ Register new grievance
 export const registerGrievance = async (req, res) => {
-  console.log('📥 Grievance Request Body:', req.body);
   
   try {
     const {
@@ -712,7 +710,6 @@ export const registerGrievance = async (req, res) => {
     }
 
     // Validate project exists
-    console.log('🔍 Checking project:', project_id);
     const [project] = await db.execute(
       "SELECT id FROM work WHERE id = ?",
       [project_id]  // Changed from id to project_id
@@ -734,8 +731,6 @@ export const registerGrievance = async (req, res) => {
     );
     
     const grievance_id = `GRV-${year}-${String(parseInt(count[0].count) + 1).padStart(3, '0')}`;
-    
-    console.log('📝 Generated Grievance ID:', grievance_id);
 
     const [result] = await db.execute(
       `INSERT INTO grievances 
@@ -755,8 +750,6 @@ export const registerGrievance = async (req, res) => {
         req.user?.name || 'System'
       ]
     );
-
-    console.log('✅ Grievance created with ID:', result.insertId);
     
     // Get the created grievance
     const [grievance] = await db.execute(

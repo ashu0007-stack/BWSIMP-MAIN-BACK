@@ -103,20 +103,15 @@ export const forgotPassword = async (req, res) => {
   const { email } = req.body;
 
   try {
-    console.log("📧 Forgot password request for:", email);
 
     const [users] = await db.execute("SELECT * FROM users WHERE email = ?", [email]);
 
     if (users.length === 0) {
-      console.log("❌ User not found:", email);
       return res.status(404).json({ message: "User not found" });
     }
 
     const token = crypto.randomBytes(32).toString("hex");
     const expireTime = new Date(Date.now() + 60 * 60 * 1000); // 1 hour
-    
-    console.log("🕒 Token expiry set to:", expireTime);
-    console.log("🕒 Current server time:", new Date());
 
     // ✅ Database update
     const [updateResult] = await db.execute(
@@ -124,20 +119,10 @@ export const forgotPassword = async (req, res) => {
       [token, expireTime, email]
     );
 
-    console.log("✅ Database update - Affected rows:", updateResult.affectedRows);
-
     const frontendURL = process.env.FRONTEND_URL || "http://localhost:3000";
     const resetLink = `${frontendURL}/reset-password?token=${token}`;
 
-    console.log("🔗 Reset link:", resetLink);
-
-    // ✅ COMPLETE EMAIL SENDING CODE
-    console.log("🔧 SMTP Configuration Check:");
-    console.log("   - SMTP_USER:", process.env.SMTP_USER ? "✅ Set" : "❌ Missing");
-    console.log("   - SMTP_PASS:", process.env.SMTP_PASS ? "✅ Set" : "❌ Missing");
-
     if (!process.env.SMTP_USER || !process.env.SMTP_PASS) {
-      console.log("❌ SMTP credentials missing in environment variables");
       return res.status(500).json({ 
         message: "Email service configuration error. Please contact support." 
       });
@@ -161,7 +146,6 @@ export const forgotPassword = async (req, res) => {
     // ✅ Verify transporter connection
     try {
       await transporter.verify();
-      console.log("✅ SMTP Connection verified successfully");
     } catch (verifyError) {
       console.error("❌ SMTP Connection failed:", verifyError);
       return res.status(500).json({ 
@@ -219,10 +203,7 @@ export const forgotPassword = async (req, res) => {
     };
 
     // ✅ Send email
-    console.log("📤 Attempting to send email to:", email);
     const emailResult = await transporter.sendMail(mailOptions);
-    console.log("✅ Email sent successfully:", emailResult.messageId);
-    console.log("✅ Email response:", emailResult.response);
 
     res.status(200).json({ 
       message: "Password reset link has been sent to your email address.",
@@ -262,10 +243,6 @@ export const forgotPassword = async (req, res) => {
 export const resetPassword = async (req, res) => {
   const { token, newPassword } = req.body;
 
-  console.log("🔄 Reset password request received");
-  console.log("📦 Token from body:", token);
-  console.log("🕒 Server time:", new Date());
-
   if (!token || !newPassword) {
     return res.status(400).json({ 
       message: "Token and new password are required." 
@@ -287,10 +264,7 @@ export const resetPassword = async (req, res) => {
       [token]
     );
 
-    console.log("🔍 Token search result:", tokenCheck.length > 0 ? "FOUND" : "NOT FOUND");
-
     if (tokenCheck.length === 0) {
-      console.log("❌ Token not found in database");
       return res.status(400).json({ 
         message: "Invalid token. Please request a new reset link." 
       });
@@ -299,27 +273,13 @@ export const resetPassword = async (req, res) => {
     const user = tokenCheck[0];
     const currentTime = new Date();
     const expiryTime = new Date(user.resetTokenExpire);
-    
-    console.log("📋 Detailed token analysis:", {
-      email: user.email,
-      resetToken: user.resetToken,
-      resetTokenExpire: user.resetTokenExpire,
-      currentTime: currentTime,
-      expiryTime: expiryTime,
-      dbCurrentTime: user.currentDbTime,
-      minutesRemaining: user.minutesRemaining,
-      timeDifferenceMs: expiryTime - currentTime,
-      timeDifferenceMinutes: Math.round((expiryTime - currentTime) / 1000 / 60),
-      isExpired: currentTime > expiryTime
-    });
-
+   
     // ✅ STEP 2: Multiple expiration checks
     const isExpiredByServerTime = currentTime > expiryTime;
     const isExpiredByDbTime = user.minutesRemaining < 0;
     
     if (isExpiredByServerTime || isExpiredByDbTime) {
       const timeDiffMinutes = Math.abs(user.minutesRemaining) || Math.round((currentTime - expiryTime) / 1000 / 60);
-      console.log(`❌ Token expired ${timeDiffMinutes} minutes ago`);
       
       // ✅ Clean up expired token
       await db.execute(
@@ -334,9 +294,6 @@ export const resetPassword = async (req, res) => {
       });
     }
 
-    console.log("✅ Valid token found for:", user.email);
-    console.log("⏰ Token expires in:", user.minutesRemaining, "minutes");
-
     // ✅ STEP 3: Hash password and update user
     const hashedPassword = await bcrypt.hash(newPassword, 10);
 
@@ -344,8 +301,6 @@ export const resetPassword = async (req, res) => {
       "UPDATE users SET password = ?, resetToken = NULL, resetTokenExpire = NULL WHERE id = ?",
       [hashedPassword, user.id]
     );
-
-    console.log("✅ Password update result - Affected rows:", updateResult.affectedRows);
 
     res.status(200).json({ 
       message: "Password has been reset successfully. You can now login with your new password.",
@@ -362,9 +317,6 @@ export const resetPassword = async (req, res) => {
 export const testToken = async (req, res) => {
   const { token } = req.query;
   
-  console.log("🧪 Test token request:", token);
-  console.log("🕒 Server time:", new Date());
-  
   try {
     const [result] = await db.execute(
       `SELECT 
@@ -380,14 +332,6 @@ export const testToken = async (req, res) => {
     
     if (result.length > 0) {
       const data = result[0];
-      console.log("✅ Token found in database:", {
-        email: data.email,
-        resetToken: data.resetToken,
-        resetTokenExpire: data.resetTokenExpire,
-        currentDbTime: data.currentDbTime,
-        timeRemaining: data.timeRemaining
-      });
-      
       res.json({
         status: "FOUND",
         email: data.email,
@@ -399,7 +343,6 @@ export const testToken = async (req, res) => {
         tokensMatch: data.resetToken === token
       });
     } else {
-      console.log("❌ Token not found in database");
       res.json({
         status: "NOT_FOUND",
         message: "Token not found in database"

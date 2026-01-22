@@ -535,8 +535,6 @@ export const deletePrograme = async (req, res) => {
   try {
     const { programId } = req.body; // ya req.params agar route /api/program/:id hai
 
-    console.log("prog id", programId)
-
     if (!programId) {
       return res.status(400).json({
         status: { success: false, message: "Programme ID is required" },

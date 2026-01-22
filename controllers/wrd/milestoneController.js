@@ -146,14 +146,8 @@ export const savePackageProgress = async (req, res) => {
   const { packageNumber, progressDate, components, remark } = req.body;
  
   try {
-    console.log("🟢 Saving progress for package:", packageNumber);
- 
     for (const comp of components) {
-  console.log(`🔍 Processing component:`, comp);
- 
   const quantity = comp.quantity && comp.quantity !== "" ? parseFloat(comp.quantity) : 0;
-  console.log(`📊 Quantity for component ${comp.componentId}: ${quantity}`);
- 
       // Get milestone_id first
       const [milestoneRows] = await db.query(
         "SELECT id FROM milestones WHERE package_number = ? AND component_id = ?",
@@ -174,8 +168,6 @@ export const savePackageProgress = async (req, res) => {
          VALUES (?, ?, ?, ?, NOW())`,
         [milestoneId, progressDate, quantity, remark || ""]
       );
- 
-      console.log(`✅ Progress inserted: ID ${result.insertId}`);
     }
  
     res.json({ message: "Progress saved successfully" });

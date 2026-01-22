@@ -6,7 +6,6 @@ const router = express.Router();
 
 // ✅ TEST ROUTE - Pehle isse check karein
 router.get('/test', (req, res) => {
-  console.log('✅ Farmers Test Route Hit!');
   res.json({
     success: true,
     message: 'Farmers API is working!',

@@ -15,6 +15,7 @@ export const getREPWorks = async (req, res) => {
     w.zone_id,
     w.circle_id,
     w.division_id,
+    w.has_spurs,
     w.Area_Under_improved_Irrigation,
     w.work_period_months,
     -- Award status display using CASE

@@ -38,10 +38,12 @@ export const getAllWorks = async (req, res) => {
     c.work_stipulated_date,
     c.email AS contractor_email,
     d.division_name as division_name,
-    c.agency_address
+    c.agency_address,
+    wb.total_population
 FROM work w
 INNER JOIN divisions d ON w.division_id = d.id
 LEFT JOIN contractors c ON w.id = c.work_id
+left join work_beneficiaries wb on w.id = wb.work_id
 ORDER BY w.package_number;
     `);
 

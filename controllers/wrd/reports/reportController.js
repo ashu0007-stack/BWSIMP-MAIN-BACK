@@ -6,16 +6,17 @@ import db from "../../../config/db.js";
 export const getREPWorks = async (req, res) => {
   try {
     const [rows] = await db.query(`
-   SELECT 
+ SELECT 
     w.id,
     w.work_name,
     w.package_number,
     w.work_cost,
+    w.has_spurs,
+    IFNULL(spur_counts.total_spurs, 0) AS total_spurs,
     w.target_km,
     w.zone_id,
     w.circle_id,
     w.division_id,
-    w.has_spurs,
     w.Area_Under_improved_Irrigation,
     w.work_period_months,
     -- Award status display using CASE
@@ -46,6 +47,11 @@ LEFT JOIN zones z ON w.zone_id = z.id
 LEFT JOIN contractors c ON w.id = c.work_id
 LEFT JOIN work_beneficiaries wb ON w.id = wb.work_id
 LEFT JOIN work_villages v ON w.id = v.work_id
+LEFT JOIN (
+    SELECT work_id, COUNT(*) as total_spurs
+    FROM work_spurs
+    GROUP BY work_id
+) spur_counts ON w.id = spur_counts.work_id
 ORDER BY w.id DESC;
     `);
 

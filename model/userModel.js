@@ -144,7 +144,7 @@ export const checkDesignationExists = async (designation_id) => {
 /* =====================================================
    ➕ CREATE USER
 ===================================================== */
-export const createUserModal = async (user) => {
+export const createUserModal = async (userData) => {
   const {
     employeeId,
     email,
@@ -155,22 +155,52 @@ export const createUserModal = async (user) => {
     user_level_id,
     designation_id,
     role_id,
-    state_id,
-    zone_id,
-    circle_id,
-    division_id,
-    sub_division_id,
-    section_id,
-    district_id,
-    block_id,
-    panchayat_id,
-    cluster_id,
-    village_id,
-  } = user;
+    state_id = null,
+    zone_id = null,
+    circle_id = null,
+    division_id = null,
+    sub_division_id = null,
+    section_id = null,
+    district_id = null,
+    block_id = null,
+    panchayat_id = null,
+    cluster_id = null,
+    village_id = null,
+    is_active = 1,
+    hrms = null 
+  } = userData;
 
-  const [result] = await db.query(
-    `
-    INSERT INTO users (
+  try {
+    const sql = `
+      INSERT INTO users (
+        employeeId,
+        email,
+        password,
+        full_name,
+        mobno,
+        department_id,
+        user_level_id,
+        designation_id,
+        role_id,
+        state_id,
+        zone_id,
+        circle_id,
+        division_id,
+        sub_division_id,
+        section_id,
+        district_id,
+        block_id,
+        panchayat_id,
+        cluster_id,
+        village_id,
+        hrms, 
+        is_active,
+        created_at,
+        updated_at
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NOW(), NOW())
+    `;
+
+    const values = [
       employeeId,
       email,
       password,
@@ -191,38 +221,22 @@ export const createUserModal = async (user) => {
       panchayat_id,
       cluster_id,
       village_id,
-      is_active,
-    ) VALUES (
-      ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 1
-    )
-    `,
-    [
-      employeeId.trim(),
-      email.toLowerCase().trim(),
-      password,
-      full_name?.trim() || null,
-      mobno || null,
-      department_id,
-      user_level_id || null,
-      designation_id,
-      role_id,
-      state_id || null,
-      zone_id || null,
-      circle_id || null,
-      division_id || null,
-      sub_division_id || null,
-      section_id || null,
-      district_id || null,
-      block_id || null,
-      panchayat_id || null,
-      cluster_id || null,
-      village_id || null,
-    ]
-  );
+      hrms,        // ✅ ADDED HRMS VALUE
+      is_active
+    ];
 
-  return result;
+    console.log('📝 Executing SQL:', sql.substring(0, 200) + '...');
+    console.log('📊 Values:', values.map(v => typeof v === 'string' ? v.substring(0, 10) + '...' : v));
+
+    const [result] = await db.execute(sql, values);
+    return result;
+
+  } catch (error) {
+    console.error('❌ SQL Error in createUserModal:', error);
+    console.error('Full SQL that failed:', error.sql);
+    throw error;
+  }
 };
-
 
 
 // UPDATE USER NAME & MOBILE

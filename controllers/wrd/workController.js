@@ -798,25 +798,110 @@ export const updateComponents = async (req, res) => {
 export const getAssignedWorks = async (req, res) => {
   try {
     const userId = req.params.userId;
-   
-    // User details
+    
+    // User details with role
     const [userRows] = await db.query(
-      `SELECT zone_id, circle_id, division_id, department_id,role_id
-       FROM users WHERE id = ?`,
+      `SELECT u.zone_id, u.circle_id, u.division_id, u.department_id, u.role_id,
+              r.role_name
+       FROM users u
+       LEFT JOIN roles r ON r.id = u.role_id
+       WHERE u.id = ?`,
       [userId]
     );
-   
+    
     if (userRows.length === 0) {
       return res.json({ success: true, works: [] });
     }
-   
+    
     const user = userRows[0];
     
-    // If no zone, circle, or division is assigned
-    if (!user.department_id && !user.zone_id && !user.circle_id && !user.division_id ) {
+    // Check if user is admin
+    const isAdmin = user.role_name && user.role_name.toLowerCase().includes('admin');
+    
+    // If user is admin, return ALL works
+    if (isAdmin) {
+      let query = `
+        SELECT
+          w.id,
+          w.work_name as name,
+          w.package_number as code,
+          w.work_cost as budget,
+          w.target_km as target,
+          w.Area_Under_improved_Irrigation as improved_area,
+          w.isAwarded_flag,
+          w.isTenderCreated_flag,
+          w.created_at,
+          w.package_number,
+          c.id as contractor_id,
+          c.contractor_name,
+          z.zone_name,
+          ci.circle_name,
+          d.division_name,
+          dept.id as department_id,
+          dept.department_name,
+          c.work_stipulated_date,
+          c.actual_date_of_completion,
+          c.contract_awarded_amount
+        FROM work w
+        LEFT JOIN contractors c ON c.work_id = w.id
+        LEFT JOIN circles ci ON ci.id = w.circle_id
+        LEFT JOIN zones z ON z.id = w.zone_id
+        LEFT JOIN divisions d ON d.id = w.division_id
+        LEFT JOIN departments dept ON dept.id = w.dept_id
+        ORDER BY w.package_number asc
+      `;
+      
+      const [works] = await db.query(query);
+      
+      const processedWorks = works.map(work => {
+        // ... same processing logic ...
+        let progress = 0;
+        if (work.isAwarded_flag === 1) progress = 50;
+        if (work.isTenderCreated_flag === 1) progress = 25;
+        
+        const locationParts = [
+          work.zone_name,
+          work.circle_name, 
+          work.division_name
+        ].filter(part => part && part.trim() !== '');
+        
+        return {
+          id: work.id.toString(),
+          name: work.name || `Work ${work.id}`,
+          code: work.code || 'N/A',
+          budget: work.contract_awarded_amount,
+          target: work.target ? `${work.target} KM` : 'Target not set',
+          progress: progress,
+          zone: work.zone_name || 'N/A',
+          circle: work.circle_name || 'N/A',
+          division: work.division_name || 'N/A',
+          location: locationParts.join(', ') || 'Location not specified',
+          status: work.isAwarded_flag === 1 ? 'In Progress' :
+                  work.isTenderCreated_flag === 1 ? 'Tender Created' : 
+                  'Not Started',
+          deadline: work.work_stipulated_date ? work.work_stipulated_date.toISOString().split('T')[0] : 'Not set',
+          completion_date: work.actual_date_of_completion ? work.actual_date_of_completion.toISOString().split('T')[0] : 'Not set',
+          contractor_name: work.contractor_name || 'No contractor assigned',
+          type: 'Irrigation Work',
+          beneficiaries: Math.floor(Math.random() * 9000) + 1000,
+          improved_area: work.improved_area || 0,
+          contractor_id: work.contractor_id || null
+        };
+      });
+      
+      return res.json({
+        success: true,
+        count: processedWorks.length,
+        works: processedWorks
+      });
+    }
+    
+    // Original logic for non-admin users
+    // If no zone, circle, division, or department is assigned
+    if (!user.department_id && !user.zone_id && !user.circle_id && !user.division_id) {
       return res.json({ success: true, works: [] });
     }
-   
+    
     // Start building query
     let query = `
       SELECT
@@ -836,7 +921,7 @@ export const getAssignedWorks = async (req, res) => {
         ci.circle_name,
         d.division_name,
         dept.id as department_id,
-		dept.department_name,
+        dept.department_name,
         c.work_stipulated_date,
         c.actual_date_of_completion,
         c.contract_awarded_amount
@@ -852,7 +937,7 @@ export const getAssignedWorks = async (req, res) => {
     const params = [];
     
     // Add conditions based on user's assignments
-     if (user.department_id) {
+    if (user.department_id) {
       conditions.push('w.dept_id = ?');
       params.push(user.department_id);
     }
@@ -871,7 +956,6 @@ export const getAssignedWorks = async (req, res) => {
       params.push(user.division_id);
     }
     
-    
     // Add WHERE clause if conditions exist
     if (conditions.length > 0) {
       query += ` WHERE ${conditions.join(' OR ')}`;
@@ -885,12 +969,11 @@ export const getAssignedWorks = async (req, res) => {
     
     // Process results
     const processedWorks = works.map(work => {
-      // Calculate progress based on flags
+      // ... same processing logic ...
       let progress = 0;
       if (work.isAwarded_flag === 1) progress = 50;
       if (work.isTenderCreated_flag === 1) progress = 25;
       
-      // Format location
       const locationParts = [
         work.zone_name,
         work.circle_name, 
@@ -930,7 +1013,6 @@ export const getAssignedWorks = async (req, res) => {
   } catch (err) {
     console.error("Error in getAssignedWorks:", err);
     
-    // Send more detailed error in development
     const errorResponse = {
       success: false,
       error: "Database error",

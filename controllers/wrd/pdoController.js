@@ -361,6 +361,7 @@ export const createPDOProgress = async (req, res) => {
       work_id,
       indicator_id,
       period,
+      quarter,
       achievement,
       female_achievement = 0,
       youth_achievement = 0,
@@ -390,21 +391,22 @@ export const createPDOProgress = async (req, res) => {
 
       // Insert progress entry with auto-calculated cumulative
       const [result] = await db.query(
-        `INSERT INTO pdo_progress 
-        (work_id, indicator_id, period, achievement, cumulative, 
-         female_achievement, youth_achievement, remark, entry_date, created_by, created_email)
-        VALUES (?, ?, ?, ?, ?, ?, ?, ?, CURDATE(), ?, ?)`,
+         `INSERT INTO pdo_progress 
+      (work_id, indicator_id, period, quarter, achievement, cumulative, 
+       female_achievement, youth_achievement, remark, entry_date, created_by, created_email)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, CURDATE(), ?, ?)`,
         [
           work_id,
-          indicator_id,
-          period,
-          parseFloat(achievement) || 0,
-          newCumulative, // Auto-calculated cumulative
-          parseFloat(female_achievement) || 0,
-          parseFloat(youth_achievement) || 0,
-          remark,
-          username || "System",
-          user_email || "system@example.com"
+        indicator_id,
+        period,
+        quarter, // यहाँ add करें
+        parseFloat(achievement) || 0,
+        newCumulative,
+        parseFloat(female_achievement) || 0,
+        parseFloat(youth_achievement) || 0,
+        remark,
+        username || "System",
+        user_email || "system@example.com"
         ]
       );
 

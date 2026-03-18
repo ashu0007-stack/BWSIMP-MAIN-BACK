@@ -490,11 +490,11 @@ export const getWorkById = async (req, res) => {
         d.division_name,
         c.circle_name,
         z.zone_name,
-         CASE 
-        WHEN w.isAwarded_flag = 1 THEN 'Awarded'
-        WHEN w.isAwarded_flag = 0 THEN 'Not Awarded'
-        ELSE 'Unknown'
-    END as award_status
+        CASE 
+          WHEN w.isAwarded_flag = 1 THEN 'Awarded'
+          WHEN w.isAwarded_flag = 0 THEN 'Not Awarded'
+          ELSE 'Unknown'
+        END as award_status
       FROM work w
       LEFT JOIN divisions d ON w.division_id = d.id
       LEFT JOIN circles c ON w.circle_id = c.id
@@ -526,11 +526,25 @@ export const getWorkById = async (req, res) => {
       [id]
     );
 
+    // Fetch spurs
+    const [spursRows] = await db.query(
+      "SELECT * FROM work_spurs WHERE work_id = ?",
+      [id]
+    );
+
+    // Fetch embankments - ADD THIS
+    const [embankmentsRows] = await db.query(
+      "SELECT * FROM work_embankments WHERE work_id = ?",
+      [id]
+    );
+
     res.json({
       ...work,
       beneficiaries: beneficiariesRows[0] || null,
       villages: villagesRows,
-      components: componentsRows
+      components: componentsRows,
+      spurs: spursRows, // Add this
+      embankments: embankmentsRows // Add this
     });
   } catch (err) {
     console.error("❌ Error fetching work details:", err);
@@ -796,229 +810,552 @@ export const updateComponents = async (req, res) => {
 };
 
 export const getAssignedWorks = async (req, res) => {
+
   try {
+
     const userId = req.params.userId;
-    
-    // User details with role
+
+    // User details
+
     const [userRows] = await db.query(
-      `SELECT u.zone_id, u.circle_id, u.division_id, u.department_id, u.role_id,
-              r.role_name
-       FROM users u
-       LEFT JOIN roles r ON r.id = u.role_id
-       WHERE u.id = ?`,
+
+      `SELECT zone_id, circle_id, division_id, department_id, role_id
+
+       FROM users WHERE id = ?`,
+
       [userId]
+
     );
-    
+
     if (userRows.length === 0) {
+
       return res.json({ success: true, works: [] });
+
     }
-    
+
     const user = userRows[0];
-    
-    // Check if user is admin
-    const isAdmin = user.role_name && user.role_name.toLowerCase().includes('admin');
-    
-    // If user is admin, return ALL works
-    if (isAdmin) {
-      let query = `
-        SELECT
-          w.id,
-          w.work_name as name,
-          w.package_number as code,
-          w.work_cost as budget,
-          w.target_km as target,
-          w.Area_Under_improved_Irrigation as improved_area,
-          w.isAwarded_flag,
-          w.isTenderCreated_flag,
-          w.created_at,
-          w.package_number,
-          c.id as contractor_id,
-          c.contractor_name,
-          z.zone_name,
-          ci.circle_name,
-          d.division_name,
-          dept.id as department_id,
-          dept.department_name,
-          c.work_stipulated_date,
-          c.actual_date_of_completion,
-          c.contract_awarded_amount
-        FROM work w
-        LEFT JOIN contractors c ON c.work_id = w.id
-        LEFT JOIN circles ci ON ci.id = w.circle_id
-        LEFT JOIN zones z ON z.id = w.zone_id
-        LEFT JOIN divisions d ON d.id = w.division_id
-        LEFT JOIN departments dept ON dept.id = w.dept_id
-        ORDER BY w.package_number asc
-      `;
-      
-      const [works] = await db.query(query);
-      
-      const processedWorks = works.map(work => {
-        // ... same processing logic ...
-        let progress = 0;
-        if (work.isAwarded_flag === 1) progress = 50;
-        if (work.isTenderCreated_flag === 1) progress = 25;
-        
-        const locationParts = [
-          work.zone_name,
-          work.circle_name, 
-          work.division_name
-        ].filter(part => part && part.trim() !== '');
-        
-        return {
-          id: work.id.toString(),
-          name: work.name || `Work ${work.id}`,
-          code: work.code || 'N/A',
-          budget: work.contract_awarded_amount,
-          target: work.target ? `${work.target} KM` : 'Target not set',
-          progress: progress,
-          zone: work.zone_name || 'N/A',
-          circle: work.circle_name || 'N/A',
-          division: work.division_name || 'N/A',
-          location: locationParts.join(', ') || 'Location not specified',
-          status: work.isAwarded_flag === 1 ? 'In Progress' :
-                  work.isTenderCreated_flag === 1 ? 'Tender Created' : 
-                  'Not Started',
-          deadline: work.work_stipulated_date ? work.work_stipulated_date.toISOString().split('T')[0] : 'Not set',
-          completion_date: work.actual_date_of_completion ? work.actual_date_of_completion.toISOString().split('T')[0] : 'Not set',
-          contractor_name: work.contractor_name || 'No contractor assigned',
-          type: 'Irrigation Work',
-          beneficiaries: Math.floor(Math.random() * 9000) + 1000,
-          improved_area: work.improved_area || 0,
-          contractor_id: work.contractor_id || null
-        };
-      });
-      
-      return res.json({
-        success: true,
-        count: processedWorks.length,
-        works: processedWorks
-      });
-    }
-    
-    // Original logic for non-admin users
+
     // If no zone, circle, division, or department is assigned
+
     if (!user.department_id && !user.zone_id && !user.circle_id && !user.division_id) {
+
       return res.json({ success: true, works: [] });
+
     }
-    
+
     // Start building query
+
     let query = `
+
       SELECT
+
         w.id,
+
         w.work_name as name,
+
         w.package_number as code,
+
         w.work_cost as budget,
+
         w.target_km as target,
+
         w.Area_Under_improved_Irrigation as improved_area,
+
         w.isAwarded_flag,
+
         w.isTenderCreated_flag,
+
         w.created_at,
+
         w.package_number,
+
         c.id as contractor_id,
+
         c.contractor_name,
+
         z.zone_name,
+
         ci.circle_name,
+
         d.division_name,
+
         dept.id as department_id,
+
         dept.department_name,
+
         c.work_stipulated_date,
+
         c.actual_date_of_completion,
+
         c.contract_awarded_amount
+
       FROM work w
+
       LEFT JOIN contractors c ON c.work_id = w.id
+
       LEFT JOIN circles ci ON ci.id = w.circle_id
+
       LEFT JOIN zones z ON z.id = w.zone_id
+
       LEFT JOIN divisions d ON d.id = w.division_id
+
       LEFT JOIN departments dept ON dept.id = w.dept_id
+
     `;
-    
+
     const conditions = [];
+
     const params = [];
-    
-    // Add conditions based on user's assignments
-    if (user.department_id) {
-      conditions.push('w.dept_id = ?');
-      params.push(user.department_id);
-    }
-    if (user.zone_id) {
-      conditions.push('w.zone_id = ?');
-      params.push(user.zone_id);
-    }
-    
-    if (user.circle_id) {
-      conditions.push('w.circle_id = ?');
-      params.push(user.circle_id);
-    }
-    
+
+    // FIXED: Priority order - Division first, then Circle, then Zone, then Department
+
     if (user.division_id) {
+
+      // Agar division ID hai to sirf division ke works dikhao
+
       conditions.push('w.division_id = ?');
+
       params.push(user.division_id);
+
     }
-    
+
+    else if (user.circle_id) {
+
+      // Agar circle ID hai to circle ke andar ke sabhi division ke works dikhao
+
+      conditions.push('w.circle_id = ?');
+
+      params.push(user.circle_id);
+
+    }
+
+    else if (user.zone_id) {
+
+      // Agar zone ID hai to zone ke andar ke sabhi circle aur division ke works dikhao
+
+      conditions.push('w.zone_id = ?');
+
+      params.push(user.zone_id);
+
+    }
+
+    else if (user.department_id) {
+
+      // Agar department ID hai to department ke sabhi works dikhao
+
+      conditions.push('w.dept_id = ?');
+
+      params.push(user.department_id);
+
+    }
+
     // Add WHERE clause if conditions exist
+
     if (conditions.length > 0) {
-      query += ` WHERE ${conditions.join(' OR ')}`;
+
+      query += ` WHERE ${conditions.join(' AND ')}`; // Changed from OR to AND
+
     }
-    
+
     // Add ORDER BY
-    query += ` ORDER BY w.package_number asc`;
-    
+
+    query += ` ORDER BY w.package_number ASC`;
+
+    console.log("Final Query:", query); // Debugging
+
+    console.log("Params:", params); // Debugging
+
     // Execute query
+
     const [works] = await db.query(query, params);
-    
+
     // Process results
+
     const processedWorks = works.map(work => {
-      // ... same processing logic ...
+
+      // Calculate progress based on flags
+
       let progress = 0;
-      if (work.isAwarded_flag === 1) progress = 50;
+
       if (work.isTenderCreated_flag === 1) progress = 25;
-      
+
+      if (work.isAwarded_flag === 1) progress = 50;
+
+      // Format location
+
       const locationParts = [
+
         work.zone_name,
+
         work.circle_name, 
+
         work.division_name
+
       ].filter(part => part && part.trim() !== '');
-      
+
       return {
+
         id: work.id.toString(),
+
         name: work.name || `Work ${work.id}`,
+
         code: work.code || 'N/A',
-        budget: work.contract_awarded_amount,
+
+        budget: work.contract_awarded_amount || work.budget || 0,
+
         target: work.target ? `${work.target} KM` : 'Target not set',
+
         progress: progress,
+
         zone: work.zone_name || 'N/A',
+
         circle: work.circle_name || 'N/A',
+
         division: work.division_name || 'N/A',
+
         location: locationParts.join(', ') || 'Location not specified',
+
         status: work.isAwarded_flag === 1 ? 'In Progress' :
+
                 work.isTenderCreated_flag === 1 ? 'Tender Created' : 
+
                 'Not Started',
-        deadline: work.work_stipulated_date ? work.work_stipulated_date.toISOString().split('T')[0] : 'Not set',
-        completion_date: work.actual_date_of_completion ? work.actual_date_of_completion.toISOString().split('T')[0] : 'Not set',
+
+        deadline: work.work_stipulated_date ? 
+
+          new Date(work.work_stipulated_date).toISOString().split('T')[0] : 'Not set',
+
+        completion_date: work.actual_date_of_completion ? 
+
+          new Date(work.actual_date_of_completion).toISOString().split('T')[0] : 'Not set',
+
         contractor_name: work.contractor_name || 'No contractor assigned',
+
         type: 'Irrigation Work',
+
         beneficiaries: Math.floor(Math.random() * 9000) + 1000,
+
         improved_area: work.improved_area || 0,
-        contractor_id: work.contractor_id || null
+
+        contractor_id: work.contractor_id || null,
+
+        department_id: work.department_id,
+
+        department_name: work.department_name
+
       };
+
     });
-    
+
     res.json({
+
       success: true,
+
       count: processedWorks.length,
+
       works: processedWorks
+
     });
-    
+
   } catch (err) {
+
     console.error("Error in getAssignedWorks:", err);
-    
+
+    // Send more detailed error in development
+
     const errorResponse = {
+
       success: false,
+
       error: "Database error",
+
       message: process.env.NODE_ENV === 'development' ? err.message : 'Internal server error'
+
     };
-    
+
     res.status(500).json(errorResponse);
+
+  }
+
+};
+ 
+
+// =============================
+// ADD EMBANKMENTS
+// =============================
+export const addEmbankments = async (req, res) => {
+  try {
+    const { workId } = req.params;
+    const { embankments, user_data } = req.body;
+
+    let user_email, username;
+    if (user_data) {
+      user_email = user_data.email;
+      username = user_data.username;
+    } else {
+      user_email = req.session.user?.email || req.session.user_email;
+      username = req.session.user?.username || req.session.username;
+    }
+
+    // Check if work exists
+    const [workCheck] = await db.query("SELECT id FROM work WHERE id = ?", [workId]);
+    if (workCheck.length === 0) {
+      return res.status(404).json({ 
+        success: false,
+        error: 'WORK_NOT_FOUND',
+        message: "Work not found" 
+      });
+    }
+
+    // Validate embankments data
+    if (!embankments || !Array.isArray(embankments) || embankments.length === 0) {
+      return res.status(400).json({
+        success: false,
+        error: 'INVALID_EMBANKMENTS_DATA',
+        message: "Embankments data is required and should be a non-empty array"
+      });
+    }
+
+    // First delete existing embankments for this work (if any)
+    await db.query("DELETE FROM work_embankments WHERE work_id = ?", [workId]);
+
+    // Insert all embankments
+    for (const embankment of embankments) {
+      // Validate required fields
+      if (!embankment.embankment_name || !embankment.embankment_length) {
+        console.warn("⚠️ Skipping invalid embankment data:", embankment);
+        continue;
+      }
+
+      await db.query(
+        `INSERT INTO work_embankments 
+          (work_id, embankment_name, embankment_length, created_by, created_email)
+         VALUES (?, ?, ?, ?, ?)`,
+        [
+          workId,
+          embankment.embankment_name.trim(),
+          parseFloat(embankment.embankment_length) || 0,
+          username || "Unknown User",
+          user_email || "unknown@example.com",
+        ]
+      );
+    }
+
+    // Update work table to indicate it has embankment
+    await db.query(
+      "UPDATE work SET has_embankment = 1 WHERE id = ?",
+      [workId]
+    );
+
+    res.json({ 
+      success: true,
+      message: "✅ Embankments added successfully",
+      count: embankments.length
+    });
+  } catch (err) {
+    console.error("❌ Error adding embankments:", err);
+    
+    // Handle duplicate entry error
+    if (err.errno === 1062) {
+      return res.status(400).json({
+        success: false,
+        error: 'DUPLICATE_EMBANKMENT_NAME',
+        message: 'An embankment with this name already exists for this work.',
+        details: 'Please use a unique embankment name for this work package.'
+      });
+    }
+
+    // Handle foreign key constraint error
+    if (err.errno === 1452) {
+      return res.status(400).json({
+        success: false,
+        error: 'INVALID_WORK_ID',
+        message: 'Invalid work ID. The work does not exist.',
+        details: 'Please check the work ID and try again.'
+      });
+    }
+
+    res.status(500).json({ 
+      success: false,
+      error: 'DATABASE_ERROR',
+      message: "Failed to add embankments",
+      details: err.message 
+    });
+  }
+};
+
+// =============================
+// GET EMBANKMENTS BY WORK ID
+// =============================
+export const getEmbankmentsByWorkId = async (req, res) => {
+  try {
+    const { workId } = req.params;
+
+    const [embankments] = await db.query(
+      `SELECT 
+        id, embankment_name, embankment_length, 
+        created_by, created_email, created_at
+       FROM work_embankments 
+       WHERE work_id = ? 
+       ORDER BY embankment_name`,
+      [workId]
+    );
+
+    res.json({ 
+      success: true,
+      embankments,
+      count: embankments.length
+    });
+  } catch (err) {
+    console.error("❌ Error fetching embankments:", err);
+    res.status(500).json({ 
+      success: false,
+      error: 'DATABASE_ERROR',
+      message: "Failed to fetch embankments",
+      details: err.message 
+    });
+  }
+};
+
+// =============================
+// UPDATE EMBANKMENTS
+// =============================
+export const updateEmbankments = async (req, res) => {
+  try {
+    const { workId } = req.params;
+    const { embankments, user_data } = req.body;
+
+    let user_email, username;
+    if (user_data) {
+      user_email = user_data.email;
+      username = user_data.username;
+    } else {
+      user_email = req.session.user?.email || req.session.user_email;
+      username = req.session.user?.username || req.session.username;
+    }
+
+    // Check if work exists
+    const [workCheck] = await db.query("SELECT id FROM work WHERE id = ?", [workId]);
+    if (workCheck.length === 0) {
+      return res.status(404).json({ 
+        success: false,
+        error: 'WORK_NOT_FOUND',
+        message: "Work not found" 
+      });
+    }
+
+    // Start transaction
+    await db.query("START TRANSACTION");
+
+    try {
+      // Delete existing embankments
+      await db.query("DELETE FROM work_embankments WHERE work_id = ?", [workId]);
+
+      // Insert updated embankments
+      if (embankments && embankments.length > 0) {
+        for (const embankment of embankments) {
+          if (!embankment.embankment_name || !embankment.embankment_length) {
+            continue;
+          }
+
+          await db.query(
+            `INSERT INTO work_embankments 
+              (work_id, embankment_name, embankment_length, created_by, created_email)
+             VALUES (?, ?, ?, ?, ?)`,
+            [
+              workId,
+              embankment.embankment_name.trim(),
+              parseFloat(embankment.embankment_length) || 0,
+              username || "Unknown User",
+              user_email || "unknown@example.com",
+            ]
+          );
+        }
+
+        // Update work table to indicate it has embankment
+        await db.query(
+          "UPDATE work SET has_embankment = 1 WHERE id = ?",
+          [workId]
+        );
+      } else {
+        // If no embankments, set has_embankment to 0
+        await db.query(
+          "UPDATE work SET has_embankment = 0 WHERE id = ?",
+          [workId]
+        );
+      }
+
+      await db.query("COMMIT");
+      
+      res.json({ 
+        success: true,
+        message: "✅ Embankments updated successfully",
+        count: embankments ? embankments.length : 0
+      });
+    } catch (err) {
+      await db.query("ROLLBACK");
+      throw err;
+    }
+  } catch (err) {
+    console.error("❌ Error updating embankments:", err);
+    res.status(500).json({ 
+      success: false,
+      error: 'DATABASE_ERROR',
+      message: "Failed to update embankments",
+      details: err.message 
+    });
+  }
+};
+
+// =============================
+// DELETE EMBANKMENT
+// =============================
+export const deleteEmbankment = async (req, res) => {
+  try {
+    const { workId, embankmentId } = req.params;
+
+    // Check if embankment exists
+    const [check] = await db.query(
+      "SELECT id FROM work_embankments WHERE id = ? AND work_id = ?",
+      [embankmentId, workId]
+    );
+
+    if (check.length === 0) {
+      return res.status(404).json({
+        success: false,
+        error: 'EMBANKMENT_NOT_FOUND',
+        message: "Embankment not found"
+      });
+    }
+
+    // Delete embankment
+    await db.query("DELETE FROM work_embankments WHERE id = ? AND work_id = ?", [embankmentId, workId]);
+
+    // Check if any embankments remain for this work
+    const [remaining] = await db.query(
+      "SELECT COUNT(*) as count FROM work_embankments WHERE work_id = ?",
+      [workId]
+    );
+
+    // If no embankments remain, update work table
+    if (remaining[0].count === 0) {
+      await db.query(
+        "UPDATE work SET has_embankment = 0 WHERE id = ?",
+        [workId]
+      );
+    }
+
+    res.json({ 
+      success: true,
+      message: "✅ Embankment deleted successfully" 
+    });
+  } catch (err) {
+    console.error("❌ Error deleting embankment:", err);
+    res.status(500).json({ 
+      success: false,
+      error: 'DATABASE_ERROR',
+      message: "Failed to delete embankment",
+      details: err.message 
+    });
   }
 };

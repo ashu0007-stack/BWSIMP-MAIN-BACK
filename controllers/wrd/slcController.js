@@ -3,134 +3,129 @@ import db from "../../config/db.js";
 export const slcController = {
 
   // Create SLC with all related data
-  createSLC: async function(req, res) {
-  try {
-    const { 
-      wua_id, 
-      slc_name, 
-      section, 
-      subdivision, 
-      circle, 
-      zone,
-      formation_date, 
-      last_election_date, 
-      next_election_date,
-      // ✅ दोनों नामों को सपोर्ट करें
-      vlc_chairmen = [],
-      slc_general_body_members = [], // नया field
-      executive_members = [],
-      water_tax_details = {}
-    } = req.body;
+createSLC: async function(req, res) {
+    try {
+      const { 
+        wua_id, 
+        slc_name, 
+        section, 
+        subdivision, 
+        circle, 
+        zone,
+        formation_date, 
+        last_election_date, 
+        next_election_date,
+        slc_general_body_members = [], 
+        executive_members = [],
+        water_tax_details = {}
+      } = req.body;
 
-    console.log("=== SLC CREATION STARTED ===");
-    
-    // ✅ दोनों sources से members लें
-    const generalBodyMembers = vlc_chairmen.length > 0 ? vlc_chairmen : slc_general_body_members;
-    
-    console.log("📝 SLC Basic Data:", { 
-      wua_id, slc_name, formation_date 
-    });
-    console.log("👥 General Body Members count:", generalBodyMembers.length);
-    console.log("🔸 Executive Members count:", executive_members.length);
-    console.log("💰 Water Tax Details:", water_tax_details);
-
-    // Validate required fields
-    if (!wua_id || !slc_name || !formation_date) {
-      return res.status(400).json({
-        success: false,
-        error: "Missing required fields: wua_id, slc_name, formation_date"
-      });
-    }
-
-    // 1. Insert SLC basic info
-    console.log("📝 Inserting SLC basic info...");
-    const [slcResult] = await db.execute(
-      `INSERT INTO slc (
-        wua_id, slc_name, section, subdivision, circle, zone,
-        formation_date, last_election_date, next_election_date, created_at
-      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, NOW())`,
-      [
-        wua_id,
-        slc_name,
-        section || null,
-        subdivision || null,
-        circle || null,
-        zone || null,
-        formation_date,
-        last_election_date || null,
-        next_election_date || null
-      ]
-    );
-
-    const slcId = slcResult.insertId;
-    console.log("✅ SLC created with ID:", slcId);
-
-    // 2. Insert General Body Members (VLC Chairmen)
-    let gbMembersInserted = 0;
-    if (generalBodyMembers.length > 0) {
-      console.log(`📝 Inserting ${generalBodyMembers.length} General Body Members...`);
+      console.log("=== SLC CREATION STARTED ===");
       
-      for (let i = 0; i < generalBodyMembers.length; i++) {
-        const member = generalBodyMembers[i];
-        if (member.name && member.name.trim() !== '') {
-          try {
-            const [result] = await db.execute(
-              `INSERT INTO slc_gb_members (
-                slc_id, name, vlc_represented, is_executive, created_at
-              ) VALUES (?, ?, ?, ?, NOW())`,
-              [
-                slcId,
-                member.name.trim(),
-                member.vlc_represented || null,
-                member.is_executive ? 1 : 0
-              ]
-            );
-            gbMembersInserted++;
-            console.log(`✅ GB Member inserted: ${member.name}`);
-          } catch (gbError) {
-            console.error(`❌ Failed to insert GB member ${member.name}:`, gbError.message);
+      console.log("👥 General Body Members:", slc_general_body_members.map(m => ({
+        name: m.name,
+        gender: m.gender,
+        vlc: m.vlc_represented
+      })));
+      
+      console.log("🔸 Executive Members:", executive_members.map(m => ({
+        name: m.name,
+        gender: m.gender,
+        designation: m.designation
+      })));
+
+      // Validate required fields
+      if (!wua_id || !slc_name || !formation_date) {
+        return res.status(400).json({
+          success: false,
+          error: "Missing required fields: wua_id, slc_name, formation_date"
+        });
+      }
+
+      // 1. Insert SLC basic info
+      const [slcResult] = await db.execute(
+        `INSERT INTO slc (
+          wua_id, slc_name, section, subdivision, circle, zone,
+          formation_date, last_election_date, next_election_date, created_at
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, NOW())`,
+        [
+          wua_id,
+          slc_name,
+          section || null,
+          subdivision || null,
+          circle || null,
+          zone || null,
+          formation_date,
+          last_election_date || null,
+          next_election_date || null
+        ]
+      );
+
+      const slcId = slcResult.insertId;
+      console.log("✅ SLC created with ID:", slcId);
+
+      // 2. Insert General Body Members (WITH GENDER)
+      let gbMembersInserted = 0;
+      if (slc_general_body_members.length > 0) {
+        console.log(`📝 Inserting ${slc_general_body_members.length} General Body Members with gender...`);
+        
+        for (const member of slc_general_body_members) {
+          if (member.name && member.name.trim() !== '') {
+            try {
+              const [result] = await db.execute(
+                `INSERT INTO slc_gb_members (
+                  slc_id, name, gender, vlc_represented, is_executive, created_at
+                ) VALUES (?, ?, ?, ?, ?, NOW())`,
+                [
+                  slcId,
+                  member.name.trim(),
+                  member.gender || null,  // ✅ Gender added here
+                  member.vlc_represented || null,
+                  member.is_executive ? 1 : 0
+                ]
+              );
+              gbMembersInserted++;
+              console.log(`✅ GB Member inserted: ${member.name} (Gender: ${member.gender || 'Not specified'})`);
+            } catch (gbError) {
+              console.error(`❌ Failed to insert GB member ${member.name}:`, gbError.message);
+            }
           }
         }
       }
-    }
 
-    // 3. Insert Executive Members
-    let executiveMembersInserted = 0;
-    if (executive_members.length > 0) {
-      console.log(`📝 Inserting ${executive_members.length} Executive Members...`);
-      
-      for (let i = 0; i < executive_members.length; i++) {
-        const member = executive_members[i];
-        if (member.name && member.name.trim() !== '') {
-          try {
-            const [result] = await db.execute(
-              `INSERT INTO slc_executive_members (
-                slc_id, name, vlc_represented, designation, election_date, created_at
-              ) VALUES (?, ?, ?, ?, ?, NOW())`,
-              [
-                slcId,
-                member.name.trim(),
-                member.vlc_represented || null,
-                member.designation || 'Member',
-                member.election_date || formation_date
-              ]
-            );
-            executiveMembersInserted++;
-            console.log(`✅ Executive Member inserted: ${member.name} (${member.designation})`);
-          } catch (execError) {
-            console.error(`❌ Failed to insert executive member ${member.name}:`, execError.message);
+      // 3. Insert Executive Members (WITH GENDER)
+      let executiveMembersInserted = 0;
+      if (executive_members.length > 0) {
+        console.log(`📝 Inserting ${executive_members.length} Executive Members with gender...`);
+        
+        for (const member of executive_members) {
+          if (member.name && member.name.trim() !== '') {
+            try {
+              const [result] = await db.execute(
+                `INSERT INTO slc_executive_members (
+                  slc_id, name, gender, vlc_represented, designation, election_date, created_at
+                ) VALUES (?, ?, ?, ?, ?, ?, NOW())`,
+                [
+                  slcId,
+                  member.name.trim(),
+                  member.gender || null,  // ✅ Gender added here
+                  member.vlc_represented || null,
+                  member.designation || 'Member',
+                  member.election_date || formation_date
+                ]
+              );
+              executiveMembersInserted++;
+              console.log(`✅ Executive Member inserted: ${member.name} (Gender: ${member.gender || 'Not specified'}, Designation: ${member.designation})`);
+            } catch (execError) {
+              console.error(`❌ Failed to insert executive member ${member.name}:`, execError.message);
+            }
           }
         }
       }
-    }
 
-    // 4. Insert Water Tax Details
-    let waterTaxInserted = 0;
-    if (water_tax_details) {
-      console.log("💰 Inserting Water Tax Details...");
-      
-      try {
-        const [result] = await db.execute(
+      // 4. Insert Water Tax Details (unchanged)
+      if (Object.keys(water_tax_details).length > 0) {
+        await db.execute(
           `INSERT INTO slc_water_tax (
             slc_id, year, kharif_tax, rabi_tax, total_tax,
             deposited_govt, retained_wua, expenditure, balance, created_at
@@ -147,39 +142,32 @@ export const slcController = {
             water_tax_details.balance || 0
           ]
         );
-        waterTaxInserted = 1;
-        console.log("✅ Water Tax details inserted");
-      } catch (taxError) {
-        console.error("❌ Failed to insert water tax details:", taxError.message);
       }
+
+      console.log("=== SLC CREATION COMPLETED ===");
+      console.log(`✅ SLC ID: ${slcId}`);
+      console.log(`✅ GB Members inserted: ${gbMembersInserted} (with gender)`);
+      console.log(`✅ Executive Members inserted: ${executiveMembersInserted} (with gender)`);
+
+      res.json({
+        success: true,
+        message: "SLC created successfully with gender data",
+        slcId: slcId,
+        data: {
+          gbMembersCount: gbMembersInserted,
+          executiveMembersCount: executiveMembersInserted
+        }
+      });
+
+    } catch (err) {
+      console.error("❌ CREATE SLC ERROR:", err);
+      res.status(500).json({
+        success: false,
+        error: "Failed to create SLC",
+        details: err.message
+      });
     }
-
-    console.log("=== SLC CREATION COMPLETED ===");
-    console.log(`✅ SLC ID: ${slcId}`);
-    console.log(`✅ GB Members inserted: ${gbMembersInserted}`);
-    console.log(`✅ Executive Members inserted: ${executiveMembersInserted}`);
-    console.log(`✅ Water Tax records inserted: ${waterTaxInserted}`);
-
-    res.json({
-      success: true,
-      message: "SLC created successfully with all related data",
-      slcId: slcId,
-      data: {
-        gbMembersCount: gbMembersInserted,
-        executiveMembersCount: executiveMembersInserted,
-        waterTaxInserted: waterTaxInserted
-      }
-    });
-
-  } catch (err) {
-    console.error("❌ CREATE SLC ERROR:", err);
-    res.status(500).json({
-      success: false,
-      error: "Failed to create SLC",
-      details: err.message
-    });
-  }
-},
+  },
 
   // ✅ GET ALL SLCs - COMPLETELY FIXED VERSION
 getAllSLCs: async function(req, res) {

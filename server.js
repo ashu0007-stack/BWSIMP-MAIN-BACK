@@ -25,6 +25,7 @@ import rddRoutes from "./routes/rddRoutes.js";
 import reportRoutes from "./routes/reportRoutes.js"
 import esRoutes from "./routes/esRoutes.js";
 import pdoRoutes from "./routes/pdoRoutes.js";
+import meRoutes from "./routes/meRoutes.js";
 dotenv.config();
 
 const app = express();
@@ -77,7 +78,8 @@ app.use("/api/length", lengthRoutes);
 app.use("/api/milestones", milestoneRoutes);
 app.use("/api/reports",reportRoutes);
 app.use("/api/esRoutes",esRoutes);
-app.use("/api/pdo", pdoRoutes)
+app.use("/api/pdo", pdoRoutes);
+app.use("/api/me", meRoutes);
 // ✅ Add RDD routes - This is what's missing!
 
 

@@ -15,6 +15,10 @@ import {
   getAssignedWorks,
   addSpurs,
   getSpursByWorkId,
+   addEmbankments,
+  getEmbankmentsByWorkId,
+  updateEmbankments,
+  deleteEmbankment,
 } from "../controllers/wrd/workController.js";
 
 import {
@@ -58,5 +62,13 @@ router.get("/package/:pkg/progress", auth, getPackageProgress);
 router.get("/package/:pkg/components", auth, getPackageComponents);
 router.post("/progress", auth, savePackageProgress);
 router.get("/assigned/:userId", auth, getAssignedWorks);
+
+
+// EMBANKMENT ROUTES
+// =============================
+router.post('/:workId/embankments', auth, addEmbankments);
+router.get('/:workId/embankments', auth, getEmbankmentsByWorkId);
+router.put('/:workId/embankments', auth, updateEmbankments);
+router.delete('/:workId/embankments/:embankmentId', auth, deleteEmbankment);
  
 export default router;

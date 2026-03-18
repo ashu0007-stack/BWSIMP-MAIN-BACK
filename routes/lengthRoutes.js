@@ -5,6 +5,7 @@ import {
   getComponentsByPackage,
   getProgressByPackage,
   addProgressEntry,
+  addEmbankmentProgressEntry,
  
 } from "../controllers/wrd/lengthController.js" // ✅ keep this correct
 import { addSpurProgressEntry, getAllSpursProgress, } from "../controllers/wrd/spurProgressController.js";  
@@ -19,5 +20,6 @@ router.get("/package/:packageNumber/progress", auth, getProgressByPackage);
 router.post("/add", auth, addProgressEntry);
 router.post("/spurs/add", auth, addSpurProgressEntry);
 router.get('/spurs/work/:workId', getAllSpursProgress);
+router.post('/add-embankment', auth, addEmbankmentProgressEntry); 
 // router.get("/spurs", auth, getSpursByPackage);
 export default router;

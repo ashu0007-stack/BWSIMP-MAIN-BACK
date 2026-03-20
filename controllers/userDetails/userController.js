@@ -1,3 +1,4 @@
+// controllers/userController.js
 import bcrypt from "bcryptjs";
 import {
   userList,
@@ -9,6 +10,7 @@ import {
   updateUserById,
   findUserById
 } from "../../model/userModel.js";
+import { sendWelcomeEmail } from "../../utils/emailService.js"; // 👈 Import email service
 
 export const createUser = async (req, res) => {
   try {
@@ -43,7 +45,7 @@ export const createUser = async (req, res) => {
       department_id = loggedInDept; // override frontend
     }
 
-    //  Duplicate check
+    // Duplicate check
     const existingUser = await findUserByEmailOrEmployeeId(email, employeeId);
     if (existingUser) {
       return res.status(409).json({
@@ -64,10 +66,10 @@ export const createUser = async (req, res) => {
       return res.status(400).json({ message: "Invalid designation selected" });
     }
 
-    //  Hash password
+    // Hash password
     const hashedPassword = await bcrypt.hash(password, 12);
 
-    //  Create user
+    // Create user
     const result = await createUserModal({
       employeeId: employeeId.trim(),
       email: email.toLowerCase().trim(),
@@ -91,9 +93,35 @@ export const createUser = async (req, res) => {
       village_id,
     });
 
+    // 👉 Send welcome email (non-blocking - background me bhejo)
+    if (result.insertId) {
+      // Don't await - let it run in background
+      sendWelcomeEmail(
+        email.toLowerCase().trim(),
+        full_name?.trim() || 'User',
+        employeeId.trim(),
+        password // Original password (not hashed)
+      )
+      .then(emailResult => {
+        if (emailResult.success) {
+          console.log(`✅ Welcome email sent to ${email}`);
+        } else {
+          console.error(`❌ Welcome email failed for ${email}:`, emailResult.error);
+          
+          // Log to database for retry
+          logFailedEmail(email, full_name, employeeId, password, emailResult.error);
+        }
+      })
+      .catch(err => {
+        console.error(`❌ Email sending error for ${email}:`, err);
+      });
+    }
+
+    // Success response
     return res.status(201).json({
-      message: "User created successfully",
+      message: "User created successfully. Credentials will be sent via email.",
       userId: result.insertId,
+      emailStatus: "queued" // Let frontend know email is being sent
     });
 
   } catch (error) {
@@ -111,12 +139,26 @@ export const createUser = async (req, res) => {
   }
 };
 
+// Helper function to log failed emails
+// const logFailedEmail = async (email, full_name, employeeId, password, error) => {
+//   try {
+//     const db = (await import('../../config/db.js')).default;
+//     await db.execute(
+//       `INSERT INTO failed_emails 
+//        (recipient, full_name, employee_id, password, error, created_at) 
+//        VALUES (?, ?, ?, ?, ?, NOW())`,
+//       [email, full_name, employeeId, password, error]
+//     );
+//     console.log(`📝 Failed email logged for ${email}`);
+//   } catch (logError) {
+//     console.error("Failed to log email error:", logError);
+//   }
+// };
 
-
+// Rest of your existing functions (getUsersList, updateUser) remain same
 export const getUsersList = async (req, res) => {
   try {
     const users = await userList();
-
     return res.status(200).json({
       status: { success: true },
       message: "Users fetched successfully",
@@ -124,7 +166,6 @@ export const getUsersList = async (req, res) => {
     });
   } catch (error) {
     console.error("Get Users Error:", error);
-
     return res.status(500).json({
       status: { success: false },
       message: "Failed to fetch users",
@@ -133,20 +174,16 @@ export const getUsersList = async (req, res) => {
   }
 };
 
-
-
 export const updateUser = async (req, res) => {
-  const userId = req.params.id; // e.g., /users/:id
+  const userId = req.params.id;
   const { full_name, mobno } = req.body;
 
   try {
-    //  Check user exists
     const user = await findUserById(userId);
     if (!user) {
       return res.status(404).json({ message: "User not found" });
     }
 
-    //  Update
     const result = await updateUserById(userId, { full_name, mobno });
 
     if (result === null) {

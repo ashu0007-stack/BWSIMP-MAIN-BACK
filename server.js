@@ -26,6 +26,7 @@ import reportRoutes from "./routes/reportRoutes.js"
 import esRoutes from "./routes/esRoutes.js";
 import pdoRoutes from "./routes/pdoRoutes.js";
 import meRoutes from "./routes/meRoutes.js";
+import superAdminRoutes from "./routes/superAdminRoutes.js";
 dotenv.config();
 
 const app = express();
@@ -80,7 +81,8 @@ app.use("/api/reports",reportRoutes);
 app.use("/api/esRoutes",esRoutes);
 app.use("/api/pdo", pdoRoutes);
 app.use("/api/me", meRoutes);
-// ✅ Add RDD routes - This is what's missing!
+app.use("/api/superadmin", superAdminRoutes); // Super Admin dashboard routes
+// ✅ Add RDD routes - This is what's missing
 
 
 

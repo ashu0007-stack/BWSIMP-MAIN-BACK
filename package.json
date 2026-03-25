@@ -20,6 +20,7 @@
     "crypto": "^1.0.1",
     "crypto-js": "^4.2.0",
     "dotenv": "^17.2.1",
+    "exceljs": "^4.4.0",
     "express": "^5.1.0",
     "express-validator": "^7.3.1",
     "joi": "^18.0.1",
@@ -28,6 +29,7 @@
     "multer": "^2.0.2",
     "mutation": "^0.0.1",
     "mysql2": "^3.14.3",
-    "nodemailer": "^7.0.7"
+    "nodemailer": "^7.0.7",
+    "pdfkit": "^0.18.0"
   }
 }

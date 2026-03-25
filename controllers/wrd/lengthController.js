@@ -175,14 +175,18 @@ export const getProgressByPackage = async (req, res) => {
       embankmentProgress = embankmentRows.map(e => ({
         id: e.id,
         start_km: parseFloat(e.start_km),
+        target_km: targetKm,
         end_km: parseFloat(e.end_km),
         length: parseFloat(e.end_km) - parseFloat(e.start_km),
-        embankment_done_km: parseFloat(e.embankment_done_km),
-        progress_percentage: ((parseFloat(e.embankment_done_km) / 
-          (parseFloat(e.end_km) - parseFloat(e.start_km))) * 100).toFixed(2),
-        date: e.progress_date,
-        created_by: e.created_by,
-        created_at: e.created_at
+  embankment_done_km: parseFloat(e.embankment_done_km),
+  pitching_done_km: parseFloat(e.pitching_done_km || 0), // Added pitching
+  progress_percentage: ((parseFloat(e.embankment_done_km) / 
+    (parseFloat(e.end_km) - parseFloat(e.start_km))) * 100).toFixed(2),
+  pitching_percentage: ((parseFloat(e.pitching_done_km || 0) / 
+    (parseFloat(e.end_km) - parseFloat(e.start_km))) * 100).toFixed(2), // Added
+  date: e.progress_date,
+  created_by: e.created_by,
+  created_at: e.created_at
       }));
 
       // Get embankment history (all entries)
@@ -422,6 +426,7 @@ export const addProgressEntry = async (req, res) => {
 };
 
 // 5️⃣ Add EMBANKMENT progress entry
+// 5️⃣ Add EMBANKMENT & PITCHING progress entry (Updated)
 export const addEmbankmentProgressEntry = async (req, res) => {
   try {
     let { 
@@ -429,6 +434,7 @@ export const addEmbankmentProgressEntry = async (req, res) => {
       startKm, 
       endKm, 
       embankmentDoneKm, 
+      pitchingDoneKm,  // Added pitching
       progressDate,
       created_by 
     } = req.body;
@@ -463,10 +469,11 @@ export const addEmbankmentProgressEntry = async (req, res) => {
     startKm = parseFloat(startKm ?? 0);
     endKm = parseFloat(endKm ?? 0);
     embankmentDoneKm = parseFloat(embankmentDoneKm ?? 0);
+    pitchingDoneKm = parseFloat(pitchingDoneKm ?? 0);
     progressDate = progressDate || null;
 
     // Validate numeric values
-    if (isNaN(startKm) || isNaN(endKm) || isNaN(embankmentDoneKm)) {
+    if (isNaN(startKm) || isNaN(endKm) || isNaN(embankmentDoneKm) || isNaN(pitchingDoneKm)) {
       return res.status(400).json({ 
         success: false,
         error: "INVALID_NUMERIC_VALUES",
@@ -483,8 +490,9 @@ export const addEmbankmentProgressEntry = async (req, res) => {
       });
     }
 
-    // Validate embankment done doesn't exceed reach length
     const reachLength = endKm - startKm;
+    
+    // Validate embankment done
     if (embankmentDoneKm > reachLength) {
       return res.status(400).json({ 
         success: false,
@@ -493,47 +501,73 @@ export const addEmbankmentProgressEntry = async (req, res) => {
       });
     }
 
-    // Validate embankment done is positive
-    if (embankmentDoneKm <= 0) {
+    // Validate pitching done
+    if (pitchingDoneKm > embankmentDoneKm) {
       return res.status(400).json({ 
         success: false,
-        error: "INVALID_PROGRESS",
-        message: "Embankment done must be greater than 0" 
+        error: "PITCHING_EXCEEDS_EMBANKMENT",
+        message: `Pitching done (${pitchingDoneKm} KM) cannot exceed embankment done (${embankmentDoneKm} KM)` 
       });
     }
 
-    // Insert into database
-    await db.execute(
-      `INSERT INTO embankment_progress 
-        (work_id, start_km, end_km, embankment_done_km, progress_date, created_by, created_at)
-       VALUES (?, ?, ?, ?, ?, ?, NOW())`,
-      [workId, startKm, endKm, embankmentDoneKm, progressDate, created_by || 'System']
+    // Check if entry already exists for this range
+    const [existingEntry] = await db.execute(
+      `SELECT id FROM embankment_progress 
+       WHERE work_id = ? AND start_km = ? AND end_km = ?`,
+      [workId, startKm, endKm]
     );
 
-    // Calculate total embankment done for this work
-    const [totalRows] = await db.execute(
-      `SELECT SUM(embankment_done_km) as total 
-       FROM embankment_progress 
-       WHERE work_id = ?`,
-      [workId]
-    );
-    
-    const totalEmbankment = parseFloat(totalRows[0]?.total || 0);
-
-    res.json({ 
-      success: true,
-      message: "✅ Embankment progress added successfully",
-      data: {
-        work_id: workId,
-        work_name: workName,
-        package_number: packageNumber,
-        start_km: startKm,
-        end_km: endKm,
-        embankment_done_km: embankmentDoneKm,
-        progress_date: progressDate,
-        total_embankment_done: totalEmbankment
-      }
-    });
+    if (existingEntry.length > 0) {
+      // Update existing entry
+      await db.execute(
+        `UPDATE embankment_progress 
+         SET embankment_done_km = ?,
+             pitching_done_km = ?,
+             progress_date = ?,
+             created_by = ?,
+             created_at = NOW()
+         WHERE id = ?`,
+        [embankmentDoneKm, pitchingDoneKm, progressDate, created_by || 'System', existingEntry[0].id]
+      );
+      
+      res.json({ 
+        success: true,
+        message: "✅ Embankment progress updated successfully",
+        data: {
+          work_id: workId,
+          work_name: workName,
+          package_number: packageNumber,
+          start_km: startKm,
+          end_km: endKm,
+          embankment_done_km: embankmentDoneKm,
+          pitching_done_km: pitchingDoneKm,
+          progress_date: progressDate
+        }
+      });
+    } else {
+      // Insert new entry
+      await db.execute(
+        `INSERT INTO embankment_progress 
+          (work_id, start_km, end_km, embankment_done_km, pitching_done_km, progress_date, created_by, created_at)
+         VALUES (?, ?, ?, ?, ?, ?, ?, NOW())`,
+        [workId, startKm, endKm, embankmentDoneKm, pitchingDoneKm, progressDate, created_by || 'System']
+      );
+      
+      res.json({ 
+        success: true,
+        message: "✅ Embankment progress added successfully",
+        data: {
+          work_id: workId,
+          work_name: workName,
+          package_number: packageNumber,
+          start_km: startKm,
+          end_km: endKm,
+          embankment_done_km: embankmentDoneKm,
+          pitching_done_km: pitchingDoneKm,
+          progress_date: progressDate
+        }
+      });
+    }
 
   } catch (err) {
     console.error("❌ Error adding embankment progress:", err);
@@ -544,6 +578,14 @@ export const addEmbankmentProgressEntry = async (req, res) => {
         success: false,
         error: "INVALID_WORK_ID",
         message: "Invalid work reference" 
+      });
+    }
+    
+    if (err.code === 'ER_BAD_FIELD_ERROR') {
+      return res.status(400).json({ 
+        success: false,
+        error: "MISSING_COLUMN",
+        message: "pitching_done_km column missing in database. Please run: ALTER TABLE embankment_progress ADD COLUMN pitching_done_km DECIMAL(10,2) DEFAULT 0" 
       });
     }
     
